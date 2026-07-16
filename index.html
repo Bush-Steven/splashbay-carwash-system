@@ -249,8 +249,8 @@ select{cursor:pointer;}
       <div class="brand-mark">
         <svg class="drop" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/><path d="M8.5 16.5a3.5 3.5 0 003.5 3.5" stroke="#0F1C2E" stroke-width="1.4" stroke-linecap="round"/></svg>
         <div>
-          <div class="brand-name">SplashBay</div>
-          <div class="brand-sub">Wash Bay Control</div>
+          <div class="brand-name" id="brandName">SplashBay</div>
+          <div class="brand-sub" id="brandSub">Wash Bay Control</div>
         </div>
       </div>
     </div>
@@ -261,6 +261,7 @@ select{cursor:pointer;}
       <li><button data-view="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="8.5" r="2.4"/><path d="M15.8 14.3c2.9.4 4.7 2.5 4.7 5.7"/></svg><span>Staff</span></button></li>
       <li><button data-view="records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M9 11h6M9 15h6M9 7h3"/></svg><span>Invoices &amp; Receipts</span></button></li>
       <li><button data-view="revenue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V9M9 21V3M15 21v-7M21 21v-11"/></svg><span>Revenue Reports</span></button></li>
+      <li><button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15 1.65 1.65 0 003.17 14H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.14.36.4.66.73.85.34.2.7.29 1.09.3h.15a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Settings</span></button></li>
     </ul>
     <div class="sidebar-foot">
       <div class="clock" id="clock">--:--:--</div>
@@ -278,6 +279,22 @@ select{cursor:pointer;}
         </div>
         <div class="topbar-actions">
           <button class="btn btn-primary" onclick="switchView('register')">+ New Registration</button>
+        </div>
+      </div>
+
+      <div class="panel" id="onboardingBanner" style="display:none;border-color:var(--aqua-dim);">
+        <div class="panel-head" style="margin-bottom:8px;">
+          <h2 style="font-size:17px;">Welcome — let's get set up</h2>
+        </div>
+        <p style="color:var(--text-dim);font-size:13.5px;line-height:1.7;margin-bottom:14px;">
+          Your system is empty and ready to go. Start by adding your staff and confirming your services and pricing,
+          then register your first vehicle.
+        </p>
+        <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="switchView('staff')">1. Add Staff</button>
+          <button class="btn" onclick="switchView('settings')">2. Set Up Services &amp; Business Info</button>
+          <button class="btn" onclick="switchView('register')">3. Register First Car</button>
+          <button class="btn btn-ghost" onclick="loadSampleData()">Or load sample data to explore</button>
         </div>
       </div>
 
@@ -470,6 +487,70 @@ select{cursor:pointer;}
       </div>
     </section>
 
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view" style="display:none;">
+      <div class="topbar">
+        <div>
+          <h1>Settings</h1>
+          <p>Configure your business, services and data</p>
+        </div>
+      </div>
+
+      <div class="panel" style="max-width:720px;">
+        <div class="panel-head"><h2>Business Details</h2><span class="sub">shown on invoices &amp; receipts</span></div>
+        <div class="form-grid">
+          <div class="field full">
+            <label>Business Name</label>
+            <input id="setBizName" placeholder="e.g. SplashBay Carwash">
+          </div>
+          <div class="field full">
+            <label>Tagline / Address</label>
+            <input id="setBizTagline" placeholder="e.g. Wash Bay Control · Nairobi">
+          </div>
+          <div class="field">
+            <label>Phone Number</label>
+            <input id="setBizPhone" placeholder="e.g. 0700 000 000">
+          </div>
+          <div class="field">
+            <label>Currency Symbol</label>
+            <input id="setBizCurrency" placeholder="e.g. KSh">
+          </div>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start;margin-top:18px;">
+          <button class="btn btn-primary" onclick="saveBusinessSettings()">Save Business Details</button>
+        </div>
+      </div>
+
+      <div class="panel" style="max-width:720px;">
+        <div class="panel-head"><h2>Services &amp; Pricing</h2><span class="sub">what you charge for</span></div>
+        <table>
+          <thead><tr><th>Service Name</th><th>Price</th><th></th></tr></thead>
+          <tbody id="servicesTableBody"></tbody>
+        </table>
+        <div class="form-grid" style="margin-top:16px;grid-template-columns:1.6fr 1fr auto;align-items:end;">
+          <div class="field"><label>New Service Name</label><input id="newSvcName" placeholder="e.g. Full Wash + Vacuum"></div>
+          <div class="field"><label>Price</label><input id="newSvcPrice" type="number" min="0" placeholder="e.g. 700"></div>
+          <button class="btn btn-primary" onclick="addService()">+ Add Service</button>
+        </div>
+      </div>
+
+      <div class="panel" style="max-width:720px;">
+        <div class="panel-head"><h2>Data &amp; Backup</h2><span class="sub" id="storageModeSub">—</span></div>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6;">
+          Your data is saved automatically in this browser. Export a backup regularly and store it somewhere safe —
+          clearing your browser data will erase everything if you don't have a backup.
+        </p>
+        <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
+          <button class="btn" onclick="exportBackup()">⬇ Export Backup (JSON)</button>
+          <button class="btn" onclick="document.getElementById('importFile').click()">⬆ Import Backup</button>
+          <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importBackup(event)">
+          <button class="btn" onclick="exportRecordsCSV()">⬇ Export Records (CSV)</button>
+          <button class="btn" onclick="loadSampleData()">Load Sample Data</button>
+          <button class="btn btn-danger" onclick="resetAllData()">Reset All Data</button>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -499,12 +580,12 @@ select{cursor:pointer;}
 <div class="modal-backdrop" id="invoiceBackdrop">
   <div class="ticket" id="invoiceTicket">
     <div class="stamp">INVOICE</div>
-    <h3>SplashBay</h3>
-    <div class="biz">Wash Bay Control · Nairobi</div>
+    <h3 id="invBizName">SplashBay</h3>
+    <div class="biz" id="invBizTagline">Wash Bay Control · Nairobi</div>
     <div class="ticket-notch"></div>
     <div id="invoiceBody"></div>
     <div class="ticket-total"><span class="k">Due</span><span class="v" id="invTotal">KSh 0</span></div>
-    <div class="ticket-foot">Thank you for choosing SplashBay<br>Please retain for pickup</div>
+    <div class="ticket-foot">Thank you for your business<br>Please retain for pickup</div>
   </div>
 </div>
 <div class="modal-actions" id="invoiceActionsWrap" style="display:none;position:fixed;bottom:30px;left:0;right:0;justify-content:center;z-index:101;">
@@ -516,8 +597,8 @@ select{cursor:pointer;}
 <div class="modal-backdrop" id="receiptBackdrop">
   <div class="ticket" id="receiptTicket">
     <div class="stamp" style="border-color:var(--aqua-dim);color:var(--aqua-dim);">PAID</div>
-    <h3>SplashBay</h3>
-    <div class="biz">Payment Receipt</div>
+    <h3 id="rcBizName">SplashBay</h3>
+    <div class="biz" id="rcBizTagline">Payment Receipt</div>
     <div class="ticket-notch"></div>
     <div id="receiptBody"></div>
     <div class="ticket-total"><span class="k">Paid</span><span class="v" id="rcTotal">KSh 0</span></div>
@@ -599,7 +680,7 @@ select{cursor:pointer;}
 
 <script>
 /* ============ DATA ============ */
-const SERVICES = [
+const DEFAULT_SERVICES = [
   {name:"Express Exterior Wash", price:400},
   {name:"Full Wash (Ext + Int)", price:700},
   {name:"Premium Detail + Wax", price:1500},
@@ -607,46 +688,89 @@ const SERVICES = [
   {name:"Interior Deep Clean", price:900},
   {name:"SUV / Van Full Wash", price:900},
 ];
+const DEFAULT_BUSINESS = { name:"SplashBay", tagline:"Wash Bay Control", phone:"", currency:"KSh" };
 
-let state = { staff: [], jobs: [], seq: 1000 };
+function freshState(){
+  return {
+    staff: [],
+    jobs: [],
+    services: DEFAULT_SERVICES.map(s=>({...s})),
+    business: {...DEFAULT_BUSINESS},
+    seq: 1000
+  };
+}
+
+let state = freshState();
 let currentPayJobId = null;
 let currentTicketId = null; // for print
 let revenueChart, serviceChart, monthChart, staffChart;
 let currentStaffDetailId = null;
 const STORAGE_KEY = "splashbay-data";
 
-/* ============ PERSISTENCE ============ */
+/* ============ PERSISTENCE ============
+   Uses the Claude Artifacts storage API when available (window.storage).
+   Falls back to the browser's localStorage when running as a standalone
+   site (e.g. hosted on GitHub Pages), so the app works either way. */
+const hasArtifactStorage = typeof window.storage !== "undefined";
+
+async function storageGet(key){
+  if(hasArtifactStorage){
+    try{ return await window.storage.get(key, false); }
+    catch(e){ return null; }
+  }
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? { key, value: raw, shared:false } : null;
+  }catch(e){ return null; }
+}
+async function storageSet(key, value){
+  if(hasArtifactStorage){
+    try{ return await window.storage.set(key, value, false); }
+    catch(e){ console.error("Save failed", e); return null; }
+  }
+  try{
+    localStorage.setItem(key, value);
+    return { key, value, shared:false };
+  }catch(e){ console.error("Save failed", e); return null; }
+}
+
 async function loadState(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, false);
+    const res = await storageGet(STORAGE_KEY);
     if(res && res.value){
-      state = JSON.parse(res.value);
+      const loaded = JSON.parse(res.value);
+      // merge with defaults so upgrades don't crash on missing fields
+      state = Object.assign(freshState(), loaded);
+      state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
+      state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
     } else {
-      seedDemoData();
+      state = freshState();
       await saveState();
     }
   }catch(e){
-    seedDemoData();
+    state = freshState();
   }
 }
 async function saveState(){
-  try{
-    await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
-  }catch(e){ console.error("Save failed", e); }
+  await storageSet(STORAGE_KEY, JSON.stringify(state));
 }
 
-function seedDemoData(){
+function loadSampleData(){
+  if(state.jobs.length || state.staff.length){
+    if(!confirm("This adds sample staff and jobs alongside your existing data. Continue?")) return;
+  }
   const now = Date.now();
-  state.staff = [
-    {id:1, name:"Brian Otieno", role:"Washer", phone:"0722 111 222", status:"active"},
-    {id:2, name:"Faith Mwangi", role:"Detailer", phone:"0733 222 333", status:"active"},
-    {id:3, name:"Kevin Njoroge", role:"Supervisor", phone:"0711 444 555", status:"off"},
-  ];
-  state.jobs = [
-    mkJob({customer:"Alice Chebet", phone:"0700111222", plate:"KDA 245B", model:"Toyota Axio, Silver", service:SERVICES[1], staffId:1, timeIn: now - 86400000, timeOut: now - 86400000 + 3600000, status:"completed", paid:true, method:"Cash"}),
-    mkJob({customer:"Moses Kiptoo", phone:"0700333444", plate:"KCB 998J", model:"Subaru Forester, Blue", service:SERVICES[2], staffId:2, timeIn: now - 3600000*5, timeOut: now - 3600000*4, status:"completed", paid:true, method:"M-Pesa"}),
-  ];
-  state.seq = 1002;
+  const s1 = state.seq++, s2 = state.seq++, s3 = state.seq++;
+  state.staff.push(
+    {id:s1, name:"Brian Otieno", role:"Washer", phone:"0722 111 222", status:"active"},
+    {id:s2, name:"Faith Mwangi", role:"Detailer", phone:"0733 222 333", status:"active"},
+    {id:s3, name:"Kevin Njoroge", role:"Supervisor", phone:"0711 444 555", status:"off"},
+  );
+  state.jobs.push(
+    mkJob({customer:"Alice Chebet", phone:"0700111222", plate:"KDA 245B", model:"Toyota Axio, Silver", service:state.services[1], staffId:s1, timeIn: now - 86400000, timeOut: now - 86400000 + 3600000, status:"completed", paid:true, method:"Cash"}),
+    mkJob({customer:"Moses Kiptoo", phone:"0700333444", plate:"KCB 998J", model:"Subaru Forester, Blue", service:state.services[2], staffId:s2, timeIn: now - 3600000*5, timeOut: now - 3600000*4, status:"completed", paid:true, method:"M-Pesa"}),
+  );
+  saveState().then(()=>{ switchView("dashboard"); });
 }
 function mkJob(o){
   const id = state.seq++;
@@ -666,6 +790,7 @@ function switchView(name){
   if(name==="records") renderRecords();
   if(name==="revenue") renderRevenue();
   if(name==="register") populateRegisterForm();
+  if(name==="settings") renderSettings();
 }
 document.getElementById("navList").addEventListener("click", e=>{
   const btn = e.target.closest("button[data-view]");
@@ -673,7 +798,7 @@ document.getElementById("navList").addEventListener("click", e=>{
 });
 
 /* ============ HELPERS ============ */
-function money(n){ return "KSh " + Math.round(n).toLocaleString(); }
+function money(n){ return (state.business?.currency || "KSh") + " " + Math.round(n||0).toLocaleString(); }
 function fmtTime(ts){ return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
 function fmtDate(ts){ return new Date(ts).toLocaleDateString([], {month:'short',day:'numeric'}); }
 function isToday(ts){ const d=new Date(ts), n=new Date(); return d.toDateString()===n.toDateString(); }
@@ -703,7 +828,9 @@ function staffName(id){ const s = state.staff.find(s=>s.id===id); return s ? s.n
 /* ============ REGISTER FORM ============ */
 function populateRegisterForm(){
   const svcSel = document.getElementById("fService");
-  svcSel.innerHTML = SERVICES.map((s,i)=>`<option value="${i}">${s.name} — ${money(s.price)}</option>`).join("");
+  svcSel.innerHTML = state.services.length
+    ? state.services.map((s,i)=>`<option value="${i}">${s.name} — ${money(s.price)}</option>`).join("")
+    : `<option value="">No services configured — add one in Settings</option>`;
   const staffSel = document.getElementById("fStaff");
   const activeStaff = state.staff.filter(s=>s.status==="active");
   staffSel.innerHTML = activeStaff.length
@@ -714,7 +841,7 @@ function populateRegisterForm(){
 document.getElementById("fService")?.addEventListener("change", updatePricePreview);
 function updatePricePreview(){
   const idx = document.getElementById("fService").value;
-  const price = SERVICES[idx] ? SERVICES[idx].price : 0;
+  const price = state.services[idx] ? state.services[idx].price : 0;
   document.getElementById("fPricePreview").textContent = money(price);
 }
 function clearRegisterForm(){
@@ -730,11 +857,12 @@ async function registerCar(){
   const svcIdx = document.getElementById("fService").value;
   const staffId = document.getElementById("fStaff").value;
 
-  if(!customer || !plate || !svcIdx || !staffId){
+  if(!customer || !plate || svcIdx==="" || !staffId){
     alert("Please fill in customer name, plate number, service and assign a staff member.");
     return;
   }
-  const service = SERVICES[svcIdx];
+  const service = state.services[svcIdx];
+  if(!service){ alert("Please add at least one service in Settings first."); return; }
   const job = mkJob({
     customer, phone, plate, model,
     service, staffId:Number(staffId),
@@ -764,9 +892,20 @@ function renderBay(){
       <td>${staffName(j.staffId)}</td>
       <td class="mono">${fmtTime(j.timeIn)}</td>
       <td class="mono">${money(j.service.price)}</td>
-      <td><button class="btn btn-sm btn-primary" onclick="openPayModal(${j.id})">Check Out</button></td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-primary" onclick="openPayModal(${j.id})">Check Out</button>
+        <button class="btn btn-sm btn-danger" onclick="cancelJob(${j.id})">Cancel</button>
+      </td>
     </tr>
   `).join("");
+}
+async function cancelJob(jobId){
+  if(!confirm("Cancel this check-in? This removes it completely (use this to fix a mistaken registration).")) return;
+  state.jobs = state.jobs.filter(j=>j.id!==jobId);
+  await saveState();
+  renderBay();
+  updateBayTag();
+  renderDashboard();
 }
 
 function openPayModal(jobId){
@@ -800,6 +939,8 @@ async function confirmCheckout(){
 function openInvoice(jobId){
   const j = state.jobs.find(j=>j.id===jobId);
   currentTicketId = "invoiceTicket";
+  document.getElementById("invBizName").textContent = state.business.name;
+  document.getElementById("invBizTagline").textContent = state.business.tagline + (state.business.phone ? " · " + state.business.phone : "");
   document.getElementById("invoiceBody").innerHTML = `
     <div class="ticket-row"><span class="k">Invoice #</span><span class="v">${j.invoiceNo}</span></div>
     <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeIn)} ${fmtTime(j.timeIn)}</span></div>
@@ -822,6 +963,8 @@ function closeInvoice(){
 function openReceipt(jobId){
   const j = state.jobs.find(j=>j.id===jobId);
   currentTicketId = "receiptTicket";
+  document.getElementById("rcBizName").textContent = state.business.name;
+  document.getElementById("rcBizTagline").textContent = "Payment Receipt";
   document.getElementById("receiptBody").innerHTML = `
     <div class="ticket-row"><span class="k">Receipt #</span><span class="v">${j.receiptNo}</span></div>
     <div class="ticket-row"><span class="k">Invoice Ref</span><span class="v">${j.invoiceNo}</span></div>
@@ -978,9 +1121,17 @@ function renderRecords(){
       <td style="display:flex;gap:6px;">
         <button class="btn btn-sm" onclick="openInvoice(${j.id})">Invoice</button>
         ${j.paid ? `<button class="btn btn-sm" onclick="openReceipt(${j.id})">Receipt</button>` : ""}
+        <button class="btn btn-sm btn-danger" onclick="deleteRecord(${j.id})">Delete</button>
       </td>
     </tr>
   `).join("");
+}
+async function deleteRecord(jobId){
+  if(!confirm("Permanently delete this record? This cannot be undone.")) return;
+  state.jobs = state.jobs.filter(j=>j.id!==jobId);
+  await saveState();
+  renderRecords();
+  renderDashboard();
 }
 
 /* ============ DASHBOARD ============ */
@@ -990,6 +1141,7 @@ function updateBayTag(){
 function renderDashboard(){
   const today = new Date();
   document.getElementById("todayLabel").textContent = "Today's overview — " + today.toLocaleDateString([], {weekday:'long', month:'long', day:'numeric'});
+  document.getElementById("onboardingBanner").style.display = (state.staff.length===0 && state.jobs.length===0) ? "block" : "none";
 
   const inBay = state.jobs.filter(j=>j.status==="in-bay");
   const completedToday = state.jobs.filter(j=>j.status==="completed" && j.timeOut && isToday(j.timeOut));
@@ -1102,6 +1254,145 @@ function renderRevenue(){
   `).join("") || `<tr><td colspan="3" class="empty-note">No data yet.</td></tr>`;
 }
 
+/* ============ SETTINGS ============ */
+function applyBusinessBranding(){
+  document.getElementById("brandName").textContent = state.business.name || "Carwash";
+  document.getElementById("brandSub").textContent = state.business.tagline || "";
+  document.title = (state.business.name || "Carwash") + " — Operations";
+}
+function renderSettings(){
+  document.getElementById("setBizName").value = state.business.name || "";
+  document.getElementById("setBizTagline").value = state.business.tagline || "";
+  document.getElementById("setBizPhone").value = state.business.phone || "";
+  document.getElementById("setBizCurrency").value = state.business.currency || "KSh";
+  document.getElementById("storageModeSub").textContent = hasArtifactStorage
+    ? "saved via Claude Artifacts storage"
+    : "saved in this browser (localStorage)";
+  renderServicesTable();
+}
+async function saveBusinessSettings(){
+  state.business = {
+    name: document.getElementById("setBizName").value.trim() || "SplashBay",
+    tagline: document.getElementById("setBizTagline").value.trim(),
+    phone: document.getElementById("setBizPhone").value.trim(),
+    currency: document.getElementById("setBizCurrency").value.trim() || "KSh",
+  };
+  await saveState();
+  applyBusinessBranding();
+  renderDashboard();
+  alert("Business details saved.");
+}
+
+function renderServicesTable(){
+  const body = document.getElementById("servicesTableBody");
+  body.innerHTML = state.services.map((s,i)=>`
+    <tr>
+      <td><input value="${s.name.replace(/"/g,'&quot;')}" onchange="updateServiceName(${i}, this.value)"></td>
+      <td style="width:140px;"><input type="number" min="0" value="${s.price}" onchange="updateServicePrice(${i}, this.value)"></td>
+      <td><button class="btn btn-sm btn-danger" onclick="removeService(${i})">Remove</button></td>
+    </tr>
+  `).join("") || `<tr><td colspan="3" class="empty-note">No services yet — add one below.</td></tr>`;
+}
+async function updateServiceName(i, val){
+  state.services[i].name = val.trim() || state.services[i].name;
+  await saveState();
+}
+async function updateServicePrice(i, val){
+  const price = Number(val);
+  state.services[i].price = isNaN(price) || price < 0 ? state.services[i].price : price;
+  await saveState();
+  renderServicesTable();
+}
+async function removeService(i){
+  if(!confirm("Remove this service? Past jobs keep their recorded price either way.")) return;
+  state.services.splice(i,1);
+  await saveState();
+  renderServicesTable();
+}
+async function addService(){
+  const name = document.getElementById("newSvcName").value.trim();
+  const price = Number(document.getElementById("newSvcPrice").value);
+  if(!name || isNaN(price) || price < 0){
+    alert("Please enter a valid service name and price.");
+    return;
+  }
+  state.services.push({name, price});
+  document.getElementById("newSvcName").value = "";
+  document.getElementById("newSvcPrice").value = "";
+  await saveState();
+  renderServicesTable();
+}
+
+/* ---- Backup / restore / export ---- */
+function downloadFile(filename, content, type){
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportBackup(){
+  const stamp = new Date().toISOString().slice(0,10);
+  downloadFile(`splashbay-backup-${stamp}.json`, JSON.stringify(state, null, 2), "application/json");
+}
+function importBackup(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e)=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(!parsed || !Array.isArray(parsed.jobs) || !Array.isArray(parsed.staff)){
+        alert("This doesn't look like a valid SplashBay backup file.");
+        return;
+      }
+      if(!confirm("Importing will replace ALL current data with this backup. Continue?")) return;
+      state = Object.assign(freshState(), parsed);
+      state.services = parsed.services && parsed.services.length ? parsed.services : DEFAULT_SERVICES.map(s=>({...s}));
+      state.business = Object.assign({...DEFAULT_BUSINESS}, parsed.business||{});
+      await saveState();
+      applyBusinessBranding();
+      renderSettings();
+      renderDashboard();
+      alert("Backup imported successfully.");
+    }catch(err){
+      alert("Couldn't read that file. Please choose a valid SplashBay backup JSON file.");
+    }
+    event.target.value = "";
+  };
+  reader.readAsText(file);
+}
+function csvEscape(v){
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+}
+function exportRecordsCSV(){
+  const rows = [["Invoice","Receipt","Customer","Phone","Plate","Vehicle","Service","Staff","Time In","Time Out","Amount","Paid","Payment Method","Status"]];
+  [...state.jobs].sort((a,b)=>a.timeIn-b.timeIn).forEach(j=>{
+    rows.push([
+      j.invoiceNo, j.receiptNo||"", j.customer, j.phone||"", j.plate, j.model||"",
+      j.service.name, staffName(j.staffId),
+      new Date(j.timeIn).toLocaleString(), j.timeOut ? new Date(j.timeOut).toLocaleString() : "",
+      j.service.price, j.paid?"Yes":"No", j.method||"", j.status
+    ]);
+  });
+  const csv = rows.map(r=>r.map(csvEscape).join(",")).join("\n");
+  const stamp = new Date().toISOString().slice(0,10);
+  downloadFile(`splashbay-records-${stamp}.csv`, csv, "text/csv");
+}
+async function resetAllData(){
+  if(!confirm("This permanently deletes ALL staff, jobs, invoices and receipts. This cannot be undone. Continue?")) return;
+  if(!confirm("Are you absolutely sure? Consider exporting a backup first.")) return;
+  state = freshState();
+  await saveState();
+  applyBusinessBranding();
+  renderSettings();
+  renderDashboard();
+  populateRegisterForm();
+}
+
 /* ============ CLOCK ============ */
 function tickClock(){
   document.getElementById("clock").textContent = new Date().toLocaleTimeString();
@@ -1111,6 +1402,7 @@ setInterval(tickClock, 1000);
 /* ============ INIT ============ */
 (async function init(){
   await loadState();
+  applyBusinessBranding();
   populateRegisterForm();
   tickClock();
   renderDashboard();
