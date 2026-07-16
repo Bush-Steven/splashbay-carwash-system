@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SplashBay — Carwash Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0F1C2E;
+  --surface:#152841;
+  --surface-2:#1C3350;
+  --line:#28425F;
+  --text:#EAF2F8;
+  --text-dim:#8FA3B8;
+  --aqua:#2DD4BF;
+  --aqua-dim:#1A9C8C;
+  --amber:#F5A524;
+  --red:#F05252;
+  --paper:#FBF9F4;
+  --ink:#1B2430;
+  --ink-dim:#6B7686;
+  --disp:'Barlow Condensed',sans-serif;
+  --body:'Inter',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  background:radial-gradient(ellipse at top left, #122543 0%, var(--bg) 55%);
+  color:var(--text);
+  font-family:var(--body);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--aqua);color:#062824;}
+
+/* ---------- Layout ---------- */
+.app{display:flex;min-height:100vh;}
+.sidebar{
+  width:230px;flex-shrink:0;
+  background:linear-gradient(180deg,#0D1A2C,#0A1522);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;
+  padding:22px 0;
+  position:sticky;top:0;height:100vh;
+}
+.brand{
+  padding:0 22px 22px 22px;
+  border-bottom:1px solid var(--line);
+  margin-bottom:18px;
+}
+.brand-mark{
+  display:flex;align-items:center;gap:10px;
+}
+.brand-mark .drop{
+  width:30px;height:30px;flex-shrink:0;
+}
+.brand-name{font-family:var(--disp);font-weight:800;font-size:24px;letter-spacing:0.3px;line-height:1;}
+.brand-sub{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-top:4px;text-transform:uppercase;}
+
+.nav{list-style:none;flex:1;padding:0 12px;}
+.nav li{margin-bottom:2px;}
+.nav button{
+  width:100%;text-align:left;background:none;border:none;color:var(--text-dim);
+  font-family:var(--body);font-weight:600;font-size:14px;
+  padding:11px 14px;border-radius:8px;cursor:pointer;
+  display:flex;align-items:center;gap:11px;
+  transition:background .15s, color .15s;
+}
+.nav button svg{width:17px;height:17px;flex-shrink:0;opacity:.8;}
+.nav button:hover{background:var(--surface);color:var(--text);}
+.nav button.active{background:var(--surface-2);color:var(--aqua);}
+.nav button.active svg{opacity:1;}
+.nav .tag{
+  font-family:var(--mono);font-size:9px;background:var(--red);color:#fff;
+  border-radius:10px;padding:1px 6px;margin-left:auto;
+}
+.sidebar-foot{padding:14px 22px 0;border-top:1px solid var(--line);margin-top:10px;}
+.sidebar-foot .clock{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+
+.main{flex:1;min-width:0;padding:28px 34px 60px;}
+.topbar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:14px;}
+.topbar h1{font-family:var(--disp);font-weight:700;font-size:34px;letter-spacing:.2px;}
+.topbar p{color:var(--text-dim);font-size:13.5px;margin-top:2px;}
+.topbar-actions{display:flex;gap:10px;}
+
+.btn{
+  font-family:var(--body);font-weight:600;font-size:13.5px;
+  padding:10px 18px;border-radius:8px;border:1px solid var(--line);
+  background:var(--surface);color:var(--text);cursor:pointer;
+  display:inline-flex;align-items:center;gap:8px;
+  transition:transform .1s, border-color .15s, background .15s;
+}
+.btn:hover{border-color:var(--aqua-dim);background:var(--surface-2);}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--aqua);border-color:var(--aqua);color:#062824;}
+.btn-primary:hover{background:#3fe0ca;border-color:#3fe0ca;}
+.btn-ghost{background:transparent;}
+.btn-sm{padding:6px 12px;font-size:12.5px;border-radius:6px;}
+.btn-danger{color:var(--red);border-color:#4a2a2a;}
+.btn-danger:hover{background:#2a1717;border-color:var(--red);}
+
+/* ---------- Cards / Stats ---------- */
+.grid-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.stat-card{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:18px 20px;position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:"";position:absolute;top:-30px;right:-30px;width:90px;height:90px;
+  border-radius:50%;background:var(--accent-glow, rgba(45,212,191,.12));filter:blur(4px);
+}
+.stat-label{font-family:var(--mono);font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.5px;}
+.stat-value{font-family:var(--disp);font-size:32px;font-weight:700;margin-top:6px;}
+.stat-foot{font-size:12px;color:var(--text-dim);margin-top:6px;}
+.stat-foot.up{color:var(--aqua);}
+.stat-foot.warn{color:var(--amber);}
+
+.panel{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:20px 22px;margin-bottom:22px;
+}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.panel-head h2{font-family:var(--disp);font-weight:700;font-size:20px;}
+.panel-head .sub{font-size:12px;color:var(--text-dim);font-family:var(--mono);}
+
+.grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;}
+
+/* ---------- Bay board (ticket-like status chips) ---------- */
+.bay-board{display:flex;flex-wrap:wrap;gap:10px;}
+.bay-chip{
+  border:1px dashed var(--line);border-radius:10px;padding:10px 14px;
+  min-width:150px;background:var(--surface-2);
+}
+.bay-chip .plate{font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:1px;}
+.bay-chip .svc{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+.bay-chip .time{font-family:var(--mono);font-size:10.5px;color:var(--amber);margin-top:6px;}
+.empty-note{color:var(--text-dim);font-size:13px;font-style:italic;padding:6px 0;}
+
+/* ---------- Tables ---------- */
+table{width:100%;border-collapse:collapse;}
+th{
+  text-align:left;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:1px;padding:8px 10px;border-bottom:1px solid var(--line);
+}
+td{padding:11px 10px;font-size:13.5px;border-bottom:1px solid var(--line);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:var(--surface-2);}
+.mono{font-family:var(--mono);}
+.badge{
+  font-family:var(--mono);font-size:10.5px;padding:3px 9px;border-radius:20px;
+  display:inline-block;letter-spacing:.5px;
+}
+.badge.in-bay{background:rgba(245,165,36,.15);color:var(--amber);}
+.badge.done{background:rgba(45,212,191,.15);color:var(--aqua);}
+.badge.paid{background:rgba(45,212,191,.15);color:var(--aqua);}
+.badge.unpaid{background:rgba(240,82,82,.15);color:var(--red);}
+.badge.active{background:rgba(45,212,191,.12);color:var(--aqua);}
+.badge.off{background:rgba(143,163,184,.15);color:var(--text-dim);}
+
+/* ---------- Forms ---------- */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field.full{grid-column:1/-1;}
+label{font-size:12px;font-weight:600;color:var(--text-dim);}
+input,select{
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+  border-radius:8px;padding:10px 12px;font-size:14px;font-family:var(--body);
+  outline:none;transition:border-color .15s;
+}
+input:focus,select:focus{border-color:var(--aqua);}
+select{cursor:pointer;}
+.price-preview{
+  font-family:var(--mono);font-size:26px;color:var(--aqua);font-weight:700;
+}
+
+/* ---------- Modal / Ticket ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(6,12,20,.72);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;z-index:100;padding:20px;
+}
+.modal-backdrop.show{display:flex;}
+.ticket{
+  background:var(--paper);color:var(--ink);width:340px;border-radius:6px;
+  padding:26px 24px 20px;font-family:var(--mono);position:relative;
+  box-shadow:0 30px 60px rgba(0,0,0,.5);
+  background-image:
+    radial-gradient(circle, transparent 9px, var(--paper) 9.5px);
+  background-size:20px 20px;
+  background-position:-10px 0;
+}
+.ticket::before,.ticket::after{
+  content:"";position:absolute;left:-10px;width:20px;height:20px;
+  background:var(--bg);border-radius:50%;
+}
+.ticket::before{top:-10px;}
+.ticket::after{bottom:-10px;}
+.ticket-notch{border-top:2px dashed #c9c3b4;margin:14px 0;}
+.ticket h3{font-family:var(--disp);font-size:22px;letter-spacing:1px;text-align:center;text-transform:uppercase;}
+.ticket .biz{text-align:center;font-size:10px;color:var(--ink-dim);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.ticket-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;}
+.ticket-row .k{color:var(--ink-dim);}
+.ticket-row .v{font-weight:700;text-align:right;}
+.ticket-total{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:2px solid var(--ink);}
+.ticket-total .k{font-family:var(--disp);font-size:16px;text-transform:uppercase;}
+.ticket-total .v{font-family:var(--disp);font-size:26px;font-weight:700;}
+.ticket-foot{text-align:center;font-size:10px;color:var(--ink-dim);margin-top:14px;letter-spacing:.5px;}
+.modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:center;}
+.stamp{
+  position:absolute;top:60px;right:20px;border:2.5px solid var(--aqua-dim);color:var(--aqua-dim);
+  font-family:var(--disp);font-weight:800;font-size:16px;padding:3px 10px;border-radius:6px;
+  transform:rotate(10deg);opacity:.85;letter-spacing:1px;
+}
+
+/* generic modal for forms */
+.modal-box{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  width:460px;max-width:100%;padding:24px;
+}
+.modal-box h3{font-family:var(--disp);font-size:22px;margin-bottom:16px;}
+
+.close-x{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;}
+
+@media print{
+  body *{visibility:hidden;}
+  .ticket, .ticket *{visibility:visible;}
+  .ticket{position:fixed;top:0;left:0;box-shadow:none;}
+  .modal-actions{display:none;}
+}
+
+@media (max-width:980px){
+  .grid-stats{grid-template-columns:repeat(2,1fr);}
+  .grid-2{grid-template-columns:1fr;}
+  .sidebar{width:72px;}
+  .brand-name,.brand-sub,.nav button span,.sidebar-foot{display:none;}
+  .nav button{justify-content:center;}
+  .main{padding:20px;}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg class="drop" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/><path d="M8.5 16.5a3.5 3.5 0 003.5 3.5" stroke="#0F1C2E" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <div>
+          <div class="brand-name">SplashBay</div>
+          <div class="brand-sub">Wash Bay Control</div>
+        </div>
+      </div>
+    </div>
+    <ul class="nav" id="navList">
+      <li><button data-view="dashboard" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Dashboard</span></button></li>
+      <li><button data-view="register"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span>New Registration</span></button></li>
+      <li><button data-view="bay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l1.5-5A2 2 0 016.4 5.5h11.2A2 2 0 0119.5 7L21 12"/><path d="M3 12h18v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1v-5z"/><circle cx="7.5" cy="17.5" r="1.2"/><circle cx="16.5" cy="17.5" r="1.2"/></svg><span>Active Bay</span> <span class="tag" id="bayTag">0</span></button></li>
+      <li><button data-view="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="8.5" r="2.4"/><path d="M15.8 14.3c2.9.4 4.7 2.5 4.7 5.7"/></svg><span>Staff</span></button></li>
+      <li><button data-view="records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M9 11h6M9 15h6M9 7h3"/></svg><span>Invoices &amp; Receipts</span></button></li>
+      <li><button data-view="revenue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V9M9 21V3M15 21v-7M21 21v-11"/></svg><span>Revenue Reports</span></button></li>
+    </ul>
+    <div class="sidebar-foot">
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <section id="view-dashboard" class="view">
+      <div class="topbar">
+        <div>
+          <h1>Dashboard</h1>
+          <p id="todayLabel">Today's overview</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="switchView('register')">+ New Registration</button>
+        </div>
+      </div>
+
+      <div class="grid-stats">
+        <div class="stat-card" style="--accent-glow: rgba(45,212,191,.15);">
+          <div class="stat-label">Revenue Today</div>
+          <div class="stat-value" id="statRevenueToday">KSh 0</div>
+          <div class="stat-foot up" id="statRevenueFoot">from paid jobs</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(245,165,36,.15);">
+          <div class="stat-label">Cars In Bay</div>
+          <div class="stat-value" id="statInBay">0</div>
+          <div class="stat-foot warn">currently being washed</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(45,212,191,.15);">
+          <div class="stat-label">Washed Today</div>
+          <div class="stat-value" id="statWashedToday">0</div>
+          <div class="stat-foot">completed jobs</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(143,163,184,.15);">
+          <div class="stat-label">Staff On Duty</div>
+          <div class="stat-value" id="statStaffActive">0</div>
+          <div class="stat-foot" id="statStaffTotal">of 0 total</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Revenue — Last 7 Days</h2>
+            <span class="sub" id="weekTotal">KSh 0 total</span>
+          </div>
+          <canvas id="revenueChart" height="150"></canvas>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Service Mix</h2>
+            <span class="sub">all time</span>
+          </div>
+          <canvas id="serviceChart" height="150"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Bay Board — In Progress</h2>
+          <span class="sub" id="bayCountSub">0 vehicles</span>
+        </div>
+        <div class="bay-board" id="bayBoard"></div>
+      </div>
+    </section>
+
+    <!-- REGISTER -->
+    <section id="view-register" class="view" style="display:none;">
+      <div class="topbar">
+        <div>
+          <h1>New Registration</h1>
+          <p>Check a vehicle in and generate its invoice</p>
+        </div>
+      </div>
+      <div class="panel" style="max-width:720px;">
+        <div class="form-grid">
+          <div class="field">
+            <label>Customer Name</label>
+            <input id="fCustomer" placeholder="e.g. Jane Wanjiru">
+          </div>
+          <div class="field">
+            <label>Phone Number</label>
+            <input id="fPhone" placeholder="e.g. 0712 345 678">
+          </div>
+          <div class="field">
+            <label>Number Plate</label>
+            <input id="fPlate" placeholder="e.g. KDA 245B" style="text-transform:uppercase;">
+          </div>
+          <div class="field">
+            <label>Car Model / Color</label>
+            <input id="fModel" placeholder="e.g. Toyota Axio, Silver">
+          </div>
+          <div class="field">
+            <label>Service</label>
+            <select id="fService"></select>
+          </div>
+          <div class="field">
+            <label>Assign Staff</label>
+            <select id="fStaff"></select>
+          </div>
+          <div class="field full">
+            <label>Amount Due</label>
+            <div class="price-preview" id="fPricePreview">KSh 0</div>
+          </div>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start;margin-top:20px;">
+          <button class="btn btn-primary" onclick="registerCar()">Check In &amp; Generate Invoice</button>
+          <button class="btn btn-ghost" onclick="clearRegisterForm()">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACTIVE BAY -->
+    <section id="view-bay" class="view" style="display:none;">
+      <div class="topbar">
+        <div>
+          <h1>Active Bay</h1>
+          <p>Vehicles currently checked in</p>
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Invoice</th><th>Plate</th><th>Customer</th><th>Service</th><th>Staff</th><th>Time In</th><th>Amount</th><th></th></tr></thead>
+          <tbody id="bayTableBody"></tbody>
+        </table>
+        <div class="empty-note" id="bayEmpty" style="display:none;">No vehicles currently in the bay. Register one to get started.</div>
+      </div>
+    </section>
+
+    <!-- STAFF -->
+    <section id="view-staff" class="view" style="display:none;">
+      <div class="topbar">
+        <div>
+          <h1>Staff</h1>
+          <p>Manage your wash attendants</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="openStaffModal()">+ Add Staff</button>
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Today</th><th>This Week</th><th>This Month</th><th>All-Time</th><th></th></tr></thead>
+          <tbody id="staffTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- RECORDS -->
+    <section id="view-records" class="view" style="display:none;">
+      <div class="topbar">
+        <div>
+          <h1>Invoices &amp; Receipts</h1>
+          <p>Full history of every job</p>
+        </div>
+        <div class="topbar-actions">
+          <input id="recordSearch" placeholder="Search plate, customer, invoice..." style="width:240px;" oninput="renderRecords()">
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Invoice</th><th>Plate</th><th>Customer</th><th>Service</th><th>In</th><th>Out</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody id="recordsTableBody"></tbody>
+        </table>
+        <div class="empty-note" id="recordsEmpty" style="display:none;">No records yet.</div>
+      </div>
+    </section>
+
+    <!-- REVENUE -->
+    <section id="view-revenue" class="view" style="display:none;">
+      <div class="topbar">
+        <div>
+          <h1>Revenue Reports</h1>
+          <p>How the business is performing</p>
+        </div>
+      </div>
+      <div class="grid-stats" style="grid-template-columns:repeat(3,1fr);">
+        <div class="stat-card" style="--accent-glow: rgba(45,212,191,.15);">
+          <div class="stat-label">All-Time Revenue</div>
+          <div class="stat-value" id="revAllTime">KSh 0</div>
+          <div class="stat-foot">from all completed &amp; paid jobs</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(245,165,36,.15);">
+          <div class="stat-label">Avg. Ticket Value</div>
+          <div class="stat-value" id="revAvg">KSh 0</div>
+          <div class="stat-foot">per completed job</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(240,82,82,.15);">
+          <div class="stat-label">Unpaid Balance</div>
+          <div class="stat-value" id="revUnpaid">KSh 0</div>
+          <div class="stat-foot warn">outstanding payments</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Revenue — Last 30 Days</h2><span class="sub" id="monthTotal">KSh 0 total</span></div>
+        <canvas id="monthChart" height="110"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Top Performing Staff</h2><span class="sub">by revenue handled</span></div>
+        <table>
+          <thead><tr><th>Staff</th><th>Jobs</th><th>Revenue Handled</th></tr></thead>
+          <tbody id="topStaffBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- STAFF MODAL -->
+<div class="modal-backdrop" id="staffModalBackdrop">
+  <div class="modal-box" style="position:relative;">
+    <button class="close-x" onclick="closeStaffModal()">&times;</button>
+    <h3>Add Staff Member</h3>
+    <div class="field" style="margin-bottom:12px;"><label>Full Name</label><input id="sName" placeholder="e.g. Brian Otieno"></div>
+    <div class="field" style="margin-bottom:12px;"><label>Role</label>
+      <select id="sRole">
+        <option>Washer</option>
+        <option>Detailer</option>
+        <option>Supervisor</option>
+        <option>Cashier</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:18px;"><label>Phone Number</label><input id="sPhone" placeholder="e.g. 0722 111 222"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="addStaff()">Add Staff</button>
+      <button class="btn btn-ghost" onclick="closeStaffModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVOICE TICKET -->
+<div class="modal-backdrop" id="invoiceBackdrop">
+  <div class="ticket" id="invoiceTicket">
+    <div class="stamp">INVOICE</div>
+    <h3>SplashBay</h3>
+    <div class="biz">Wash Bay Control · Nairobi</div>
+    <div class="ticket-notch"></div>
+    <div id="invoiceBody"></div>
+    <div class="ticket-total"><span class="k">Due</span><span class="v" id="invTotal">KSh 0</span></div>
+    <div class="ticket-foot">Thank you for choosing SplashBay<br>Please retain for pickup</div>
+  </div>
+</div>
+<div class="modal-actions" id="invoiceActionsWrap" style="display:none;position:fixed;bottom:30px;left:0;right:0;justify-content:center;z-index:101;">
+  <button class="btn btn-primary" onclick="printCurrentTicket()">Print</button>
+  <button class="btn" onclick="closeInvoice()">Close</button>
+</div>
+
+<!-- RECEIPT TICKET -->
+<div class="modal-backdrop" id="receiptBackdrop">
+  <div class="ticket" id="receiptTicket">
+    <div class="stamp" style="border-color:var(--aqua-dim);color:var(--aqua-dim);">PAID</div>
+    <h3>SplashBay</h3>
+    <div class="biz">Payment Receipt</div>
+    <div class="ticket-notch"></div>
+    <div id="receiptBody"></div>
+    <div class="ticket-total"><span class="k">Paid</span><span class="v" id="rcTotal">KSh 0</span></div>
+    <div class="ticket-foot">See you again soon!<br>Keep this receipt as proof of payment</div>
+  </div>
+</div>
+<div class="modal-actions" id="receiptActionsWrap" style="display:none;position:fixed;bottom:30px;left:0;right:0;justify-content:center;z-index:101;">
+  <button class="btn btn-primary" onclick="printCurrentTicket()">Print</button>
+  <button class="btn" onclick="closeReceipt()">Close</button>
+</div>
+
+<!-- CHECKOUT / PAYMENT MODAL -->
+<div class="modal-backdrop" id="payModalBackdrop">
+  <div class="modal-box" style="position:relative;">
+    <button class="close-x" onclick="closePayModal()">&times;</button>
+    <h3>Checkout Vehicle</h3>
+    <div id="payJobSummary" style="margin-bottom:16px;color:var(--text-dim);font-size:13px;"></div>
+    <div class="field" style="margin-bottom:18px;">
+      <label>Payment Method</label>
+      <select id="payMethod">
+        <option>Cash</option>
+        <option>M-Pesa</option>
+        <option>Card</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="confirmCheckout()">Confirm Payment &amp; Print Receipt</button>
+      <button class="btn btn-ghost" onclick="closePayModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- STAFF DETAIL / SALES MODAL -->
+<div class="modal-backdrop" id="staffDetailBackdrop">
+  <div class="modal-box" style="position:relative;width:600px;max-width:100%;">
+    <button class="close-x" onclick="closeStaffDetail()">&times;</button>
+    <h3 id="sdName">Staff</h3>
+    <p id="sdRolePhone" style="color:var(--text-dim);font-size:12.5px;margin-top:-10px;margin-bottom:16px;"></p>
+
+    <div class="grid-stats" style="grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+      <div class="stat-card" style="padding:12px 14px;--accent-glow: rgba(45,212,191,.15);">
+        <div class="stat-label">Today</div>
+        <div class="stat-value" id="sdToday" style="font-size:20px;">KSh 0</div>
+        <div class="stat-foot" id="sdTodayJobs" style="margin-top:2px;">0 jobs</div>
+      </div>
+      <div class="stat-card" style="padding:12px 14px;--accent-glow: rgba(245,165,36,.15);">
+        <div class="stat-label">This Week</div>
+        <div class="stat-value" id="sdWeek" style="font-size:20px;">KSh 0</div>
+        <div class="stat-foot" id="sdWeekJobs" style="margin-top:2px;">0 jobs</div>
+      </div>
+      <div class="stat-card" style="padding:12px 14px;--accent-glow: rgba(45,212,191,.15);">
+        <div class="stat-label">This Month</div>
+        <div class="stat-value" id="sdMonth" style="font-size:20px;">KSh 0</div>
+        <div class="stat-foot" id="sdMonthJobs" style="margin-top:2px;">0 jobs</div>
+      </div>
+      <div class="stat-card" style="padding:12px 14px;--accent-glow: rgba(143,163,184,.15);">
+        <div class="stat-label">All-Time</div>
+        <div class="stat-value" id="sdAll" style="font-size:20px;">KSh 0</div>
+        <div class="stat-foot" id="sdAllJobs" style="margin-top:2px;">0 jobs</div>
+      </div>
+    </div>
+
+    <div class="panel-head" style="margin-bottom:10px;">
+      <h2 style="font-size:16px;">Daily Revenue — Last 7 Days</h2>
+    </div>
+    <canvas id="staffChart" height="90" style="margin-bottom:18px;"></canvas>
+
+    <div class="panel-head" style="margin-bottom:8px;">
+      <h2 style="font-size:16px;">Recent Sales</h2>
+    </div>
+    <div style="max-height:220px;overflow-y:auto;">
+      <table>
+        <thead><tr><th>Date</th><th>Invoice</th><th>Plate</th><th>Service</th><th>Amount</th></tr></thead>
+        <tbody id="sdJobsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ DATA ============ */
+const SERVICES = [
+  {name:"Express Exterior Wash", price:400},
+  {name:"Full Wash (Ext + Int)", price:700},
+  {name:"Premium Detail + Wax", price:1500},
+  {name:"Engine Bay Clean", price:600},
+  {name:"Interior Deep Clean", price:900},
+  {name:"SUV / Van Full Wash", price:900},
+];
+
+let state = { staff: [], jobs: [], seq: 1000 };
+let currentPayJobId = null;
+let currentTicketId = null; // for print
+let revenueChart, serviceChart, monthChart, staffChart;
+let currentStaffDetailId = null;
+const STORAGE_KEY = "splashbay-data";
+
+/* ============ PERSISTENCE ============ */
+async function loadState(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, false);
+    if(res && res.value){
+      state = JSON.parse(res.value);
+    } else {
+      seedDemoData();
+      await saveState();
+    }
+  }catch(e){
+    seedDemoData();
+  }
+}
+async function saveState(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+  }catch(e){ console.error("Save failed", e); }
+}
+
+function seedDemoData(){
+  const now = Date.now();
+  state.staff = [
+    {id:1, name:"Brian Otieno", role:"Washer", phone:"0722 111 222", status:"active"},
+    {id:2, name:"Faith Mwangi", role:"Detailer", phone:"0733 222 333", status:"active"},
+    {id:3, name:"Kevin Njoroge", role:"Supervisor", phone:"0711 444 555", status:"off"},
+  ];
+  state.jobs = [
+    mkJob({customer:"Alice Chebet", phone:"0700111222", plate:"KDA 245B", model:"Toyota Axio, Silver", service:SERVICES[1], staffId:1, timeIn: now - 86400000, timeOut: now - 86400000 + 3600000, status:"completed", paid:true, method:"Cash"}),
+    mkJob({customer:"Moses Kiptoo", phone:"0700333444", plate:"KCB 998J", model:"Subaru Forester, Blue", service:SERVICES[2], staffId:2, timeIn: now - 3600000*5, timeOut: now - 3600000*4, status:"completed", paid:true, method:"M-Pesa"}),
+  ];
+  state.seq = 1002;
+}
+function mkJob(o){
+  const id = state.seq++;
+  return Object.assign({
+    id, invoiceNo: "INV-" + id, receiptNo: null,
+  }, o);
+}
+
+/* ============ NAV ============ */
+function switchView(name){
+  document.querySelectorAll(".view").forEach(v=>v.style.display="none");
+  document.getElementById("view-"+name).style.display="block";
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===name));
+  if(name==="dashboard") renderDashboard();
+  if(name==="bay") renderBay();
+  if(name==="staff") renderStaff();
+  if(name==="records") renderRecords();
+  if(name==="revenue") renderRevenue();
+  if(name==="register") populateRegisterForm();
+}
+document.getElementById("navList").addEventListener("click", e=>{
+  const btn = e.target.closest("button[data-view]");
+  if(btn) switchView(btn.dataset.view);
+});
+
+/* ============ HELPERS ============ */
+function money(n){ return "KSh " + Math.round(n).toLocaleString(); }
+function fmtTime(ts){ return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+function fmtDate(ts){ return new Date(ts).toLocaleDateString([], {month:'short',day:'numeric'}); }
+function isToday(ts){ const d=new Date(ts), n=new Date(); return d.toDateString()===n.toDateString(); }
+function startOfWeek(d){
+  const dt = new Date(d); const day = dt.getDay(); // 0=Sun
+  const diff = day===0 ? 6 : day-1; // week starts Monday
+  dt.setDate(dt.getDate()-diff); dt.setHours(0,0,0,0);
+  return dt;
+}
+function isThisWeek(ts){ const d=new Date(ts); return d >= startOfWeek(new Date()); }
+function isThisMonth(ts){ const d=new Date(ts), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth(); }
+function periodTotals(jobs){
+  const paid = jobs.filter(j=>j.paid && j.timeOut);
+  const today = paid.filter(j=>isToday(j.timeOut));
+  const week = paid.filter(j=>isThisWeek(j.timeOut));
+  const month = paid.filter(j=>isThisMonth(j.timeOut));
+  const sum = arr=>arr.reduce((s,j)=>s+j.service.price,0);
+  return {
+    today:{rev:sum(today), jobs:today.length},
+    week:{rev:sum(week), jobs:week.length},
+    month:{rev:sum(month), jobs:month.length},
+    all:{rev:sum(paid), jobs:paid.length},
+  };
+}
+function staffName(id){ const s = state.staff.find(s=>s.id===id); return s ? s.name : "Unassigned"; }
+
+/* ============ REGISTER FORM ============ */
+function populateRegisterForm(){
+  const svcSel = document.getElementById("fService");
+  svcSel.innerHTML = SERVICES.map((s,i)=>`<option value="${i}">${s.name} — ${money(s.price)}</option>`).join("");
+  const staffSel = document.getElementById("fStaff");
+  const activeStaff = state.staff.filter(s=>s.status==="active");
+  staffSel.innerHTML = activeStaff.length
+    ? activeStaff.map(s=>`<option value="${s.id}">${s.name} (${s.role})</option>`).join("")
+    : `<option value="">No active staff — add one first</option>`;
+  updatePricePreview();
+}
+document.getElementById("fService")?.addEventListener("change", updatePricePreview);
+function updatePricePreview(){
+  const idx = document.getElementById("fService").value;
+  const price = SERVICES[idx] ? SERVICES[idx].price : 0;
+  document.getElementById("fPricePreview").textContent = money(price);
+}
+function clearRegisterForm(){
+  ["fCustomer","fPhone","fPlate","fModel"].forEach(id=>document.getElementById(id).value="");
+  populateRegisterForm();
+}
+
+async function registerCar(){
+  const customer = document.getElementById("fCustomer").value.trim();
+  const phone = document.getElementById("fPhone").value.trim();
+  const plate = document.getElementById("fPlate").value.trim().toUpperCase();
+  const model = document.getElementById("fModel").value.trim();
+  const svcIdx = document.getElementById("fService").value;
+  const staffId = document.getElementById("fStaff").value;
+
+  if(!customer || !plate || !svcIdx || !staffId){
+    alert("Please fill in customer name, plate number, service and assign a staff member.");
+    return;
+  }
+  const service = SERVICES[svcIdx];
+  const job = mkJob({
+    customer, phone, plate, model,
+    service, staffId:Number(staffId),
+    timeIn: Date.now(), timeOut:null,
+    status:"in-bay", paid:false, method:null
+  });
+  state.jobs.push(job);
+  await saveState();
+  clearRegisterForm();
+  openInvoice(job.id);
+  updateBayTag();
+}
+
+/* ============ BAY / CHECKOUT ============ */
+function renderBay(){
+  const jobs = state.jobs.filter(j=>j.status==="in-bay").sort((a,b)=>a.timeIn-b.timeIn);
+  const body = document.getElementById("bayTableBody");
+  const empty = document.getElementById("bayEmpty");
+  if(jobs.length===0){ body.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  body.innerHTML = jobs.map(j=>`
+    <tr>
+      <td class="mono">${j.invoiceNo}</td>
+      <td class="mono">${j.plate}</td>
+      <td>${j.customer}</td>
+      <td>${j.service.name}</td>
+      <td>${staffName(j.staffId)}</td>
+      <td class="mono">${fmtTime(j.timeIn)}</td>
+      <td class="mono">${money(j.service.price)}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="openPayModal(${j.id})">Check Out</button></td>
+    </tr>
+  `).join("");
+}
+
+function openPayModal(jobId){
+  currentPayJobId = jobId;
+  const j = state.jobs.find(j=>j.id===jobId);
+  document.getElementById("payJobSummary").innerHTML = `
+    <b>${j.plate}</b> — ${j.customer}<br>
+    ${j.service.name} · Staff: ${staffName(j.staffId)}<br>
+    Amount due: <b style="color:var(--aqua)">${money(j.service.price)}</b>
+  `;
+  document.getElementById("payModalBackdrop").classList.add("show");
+}
+function closePayModal(){ document.getElementById("payModalBackdrop").classList.remove("show"); currentPayJobId=null; }
+
+async function confirmCheckout(){
+  const j = state.jobs.find(j=>j.id===currentPayJobId);
+  if(!j) return;
+  j.timeOut = Date.now();
+  j.status = "completed";
+  j.paid = true;
+  j.method = document.getElementById("payMethod").value;
+  j.receiptNo = "RCT-" + (state.seq++);
+  await saveState();
+  closePayModal();
+  openReceipt(j.id);
+  renderBay();
+  updateBayTag();
+}
+
+/* ============ INVOICE / RECEIPT TICKETS ============ */
+function openInvoice(jobId){
+  const j = state.jobs.find(j=>j.id===jobId);
+  currentTicketId = "invoiceTicket";
+  document.getElementById("invoiceBody").innerHTML = `
+    <div class="ticket-row"><span class="k">Invoice #</span><span class="v">${j.invoiceNo}</span></div>
+    <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeIn)} ${fmtTime(j.timeIn)}</span></div>
+    <div class="ticket-row"><span class="k">Customer</span><span class="v">${j.customer}</span></div>
+    <div class="ticket-row"><span class="k">Phone</span><span class="v">${j.phone||"—"}</span></div>
+    <div class="ticket-row"><span class="k">Plate</span><span class="v">${j.plate}</span></div>
+    <div class="ticket-row"><span class="k">Vehicle</span><span class="v">${j.model||"—"}</span></div>
+    <div class="ticket-row"><span class="k">Service</span><span class="v">${j.service.name}</span></div>
+    <div class="ticket-row"><span class="k">Attendant</span><span class="v">${staffName(j.staffId)}</span></div>
+  `;
+  document.getElementById("invTotal").textContent = money(j.service.price);
+  document.getElementById("invoiceBackdrop").classList.add("show");
+  document.getElementById("invoiceActionsWrap").style.display="flex";
+}
+function closeInvoice(){
+  document.getElementById("invoiceBackdrop").classList.remove("show");
+  document.getElementById("invoiceActionsWrap").style.display="none";
+  renderDashboard();
+}
+function openReceipt(jobId){
+  const j = state.jobs.find(j=>j.id===jobId);
+  currentTicketId = "receiptTicket";
+  document.getElementById("receiptBody").innerHTML = `
+    <div class="ticket-row"><span class="k">Receipt #</span><span class="v">${j.receiptNo}</span></div>
+    <div class="ticket-row"><span class="k">Invoice Ref</span><span class="v">${j.invoiceNo}</span></div>
+    <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeOut)} ${fmtTime(j.timeOut)}</span></div>
+    <div class="ticket-row"><span class="k">Customer</span><span class="v">${j.customer}</span></div>
+    <div class="ticket-row"><span class="k">Plate</span><span class="v">${j.plate}</span></div>
+    <div class="ticket-row"><span class="k">Service</span><span class="v">${j.service.name}</span></div>
+    <div class="ticket-row"><span class="k">Time In</span><span class="v">${fmtTime(j.timeIn)}</span></div>
+    <div class="ticket-row"><span class="k">Time Out</span><span class="v">${fmtTime(j.timeOut)}</span></div>
+    <div class="ticket-row"><span class="k">Payment Method</span><span class="v">${j.method}</span></div>
+  `;
+  document.getElementById("rcTotal").textContent = money(j.service.price);
+  document.getElementById("receiptBackdrop").classList.add("show");
+  document.getElementById("receiptActionsWrap").style.display="flex";
+}
+function closeReceipt(){
+  document.getElementById("receiptBackdrop").classList.remove("show");
+  document.getElementById("receiptActionsWrap").style.display="none";
+  renderDashboard();
+  renderRecords();
+}
+function printCurrentTicket(){ window.print(); }
+
+/* ============ STAFF ============ */
+function openStaffModal(){ document.getElementById("staffModalBackdrop").classList.add("show"); }
+function closeStaffModal(){
+  document.getElementById("staffModalBackdrop").classList.remove("show");
+  ["sName","sPhone"].forEach(id=>document.getElementById(id).value="");
+}
+async function addStaff(){
+  const name = document.getElementById("sName").value.trim();
+  const role = document.getElementById("sRole").value;
+  const phone = document.getElementById("sPhone").value.trim();
+  if(!name){ alert("Please enter the staff member's name."); return; }
+  state.staff.push({ id: state.seq++, name, role, phone, status:"active" });
+  await saveState();
+  closeStaffModal();
+  renderStaff();
+}
+async function toggleStaffStatus(id){
+  const s = state.staff.find(s=>s.id===id);
+  s.status = s.status==="active" ? "off" : "active";
+  await saveState();
+  renderStaff();
+}
+async function removeStaff(id){
+  if(!confirm("Remove this staff member? Their past job records will be kept.")) return;
+  state.staff = state.staff.filter(s=>s.id!==id);
+  await saveState();
+  renderStaff();
+}
+function renderStaff(){
+  const body = document.getElementById("staffTableBody");
+  body.innerHTML = state.staff.map(s=>{
+    const jobs = state.jobs.filter(j=>j.staffId===s.id);
+    const t = periodTotals(jobs);
+    return `
+    <tr>
+      <td>${s.name}<div style="font-size:11px;color:var(--text-dim);">${s.phone||"—"}</div></td>
+      <td>${s.role}</td>
+      <td><span class="badge ${s.status}">${s.status==="active"?"On Duty":"Off Duty"}</span></td>
+      <td class="mono">${money(t.today.rev)}<div style="font-size:10.5px;color:var(--text-dim);">${t.today.jobs} jobs</div></td>
+      <td class="mono">${money(t.week.rev)}<div style="font-size:10.5px;color:var(--text-dim);">${t.week.jobs} jobs</div></td>
+      <td class="mono">${money(t.month.rev)}<div style="font-size:10.5px;color:var(--text-dim);">${t.month.jobs} jobs</div></td>
+      <td class="mono">${money(t.all.rev)}<div style="font-size:10.5px;color:var(--text-dim);">${t.all.jobs} jobs</div></td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-primary" onclick="openStaffDetail(${s.id})">View Sales</button>
+        <button class="btn btn-sm" onclick="toggleStaffStatus(${s.id})">${s.status==="active"?"Set Off":"Set On"}</button>
+        <button class="btn btn-sm btn-danger" onclick="removeStaff(${s.id})">Remove</button>
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="8" class="empty-note">No staff added yet.</td></tr>`;
+}
+
+/* ---- Staff detail / sales modal ---- */
+function openStaffDetail(staffId){
+  currentStaffDetailId = staffId;
+  renderStaffDetail(staffId);
+  document.getElementById("staffDetailBackdrop").classList.add("show");
+}
+function closeStaffDetail(){
+  document.getElementById("staffDetailBackdrop").classList.remove("show");
+  currentStaffDetailId = null;
+}
+function renderStaffDetail(staffId){
+  const s = state.staff.find(s=>s.id===staffId);
+  if(!s) return;
+  document.getElementById("sdName").textContent = s.name;
+  document.getElementById("sdRolePhone").textContent = s.role + (s.phone ? " · " + s.phone : "");
+
+  const jobs = state.jobs.filter(j=>j.staffId===staffId);
+  const t = periodTotals(jobs);
+  document.getElementById("sdToday").textContent = money(t.today.rev);
+  document.getElementById("sdTodayJobs").textContent = t.today.jobs + " job" + (t.today.jobs===1?"":"s");
+  document.getElementById("sdWeek").textContent = money(t.week.rev);
+  document.getElementById("sdWeekJobs").textContent = t.week.jobs + " job" + (t.week.jobs===1?"":"s");
+  document.getElementById("sdMonth").textContent = money(t.month.rev);
+  document.getElementById("sdMonthJobs").textContent = t.month.jobs + " job" + (t.month.jobs===1?"":"s");
+  document.getElementById("sdAll").textContent = money(t.all.rev);
+  document.getElementById("sdAllJobs").textContent = t.all.jobs + " job" + (t.all.jobs===1?"":"s");
+
+  // 7-day chart for this staff member
+  const days = last7Days();
+  const labels = days.map(d=>d.toLocaleDateString([], {weekday:'short'}));
+  const totals = days.map(d=> jobs.filter(j=>j.paid && j.timeOut && new Date(j.timeOut).toDateString()===d.toDateString()).reduce((s2,j)=>s2+j.service.price,0));
+  const ctx = document.getElementById("staffChart");
+  if(staffChart) staffChart.destroy();
+  staffChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ data: totals, backgroundColor:'#F5A524', borderRadius:6, maxBarThickness:30 }]},
+    options:{
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>money(c.raw)}}},
+      scales:{
+        y:{ ticks:{ color:'#8FA3B8', callback:v=>v>=1000?(v/1000)+'k':v }, grid:{ color:'#28425F' } },
+        x:{ ticks:{ color:'#8FA3B8' }, grid:{ display:false } }
+      }
+    }
+  });
+
+  // recent sales list (paid jobs, most recent first)
+  const paidJobs = jobs.filter(j=>j.paid).sort((a,b)=>b.timeOut-a.timeOut);
+  document.getElementById("sdJobsBody").innerHTML = paidJobs.length ? paidJobs.map(j=>`
+    <tr>
+      <td class="mono">${fmtDate(j.timeOut)} ${fmtTime(j.timeOut)}</td>
+      <td class="mono">${j.invoiceNo}</td>
+      <td class="mono">${j.plate}</td>
+      <td>${j.service.name}</td>
+      <td class="mono">${money(j.service.price)}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="5" class="empty-note">No completed sales yet.</td></tr>`;
+}
+
+/* ============ RECORDS ============ */
+function renderRecords(){
+  const q = (document.getElementById("recordSearch")?.value || "").toLowerCase();
+  const jobs = [...state.jobs].sort((a,b)=>b.timeIn-a.timeIn).filter(j=>{
+    if(!q) return true;
+    return j.plate.toLowerCase().includes(q) || j.customer.toLowerCase().includes(q) || j.invoiceNo.toLowerCase().includes(q);
+  });
+  const body = document.getElementById("recordsTableBody");
+  const empty = document.getElementById("recordsEmpty");
+  if(jobs.length===0){ body.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  body.innerHTML = jobs.map(j=>`
+    <tr>
+      <td class="mono">${j.invoiceNo}</td>
+      <td class="mono">${j.plate}</td>
+      <td>${j.customer}</td>
+      <td>${j.service.name}</td>
+      <td class="mono">${fmtTime(j.timeIn)}</td>
+      <td class="mono">${j.timeOut ? fmtTime(j.timeOut) : "—"}</td>
+      <td class="mono">${money(j.service.price)}</td>
+      <td><span class="badge ${j.paid?'paid':'unpaid'}">${j.paid?'Paid':(j.status==='in-bay'?'In Bay':'Unpaid')}</span></td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-sm" onclick="openInvoice(${j.id})">Invoice</button>
+        ${j.paid ? `<button class="btn btn-sm" onclick="openReceipt(${j.id})">Receipt</button>` : ""}
+      </td>
+    </tr>
+  `).join("");
+}
+
+/* ============ DASHBOARD ============ */
+function updateBayTag(){
+  document.getElementById("bayTag").textContent = state.jobs.filter(j=>j.status==="in-bay").length;
+}
+function renderDashboard(){
+  const today = new Date();
+  document.getElementById("todayLabel").textContent = "Today's overview — " + today.toLocaleDateString([], {weekday:'long', month:'long', day:'numeric'});
+
+  const inBay = state.jobs.filter(j=>j.status==="in-bay");
+  const completedToday = state.jobs.filter(j=>j.status==="completed" && j.timeOut && isToday(j.timeOut));
+  const revenueToday = completedToday.reduce((s,j)=>s+j.service.price,0);
+  const activeStaff = state.staff.filter(s=>s.status==="active").length;
+
+  document.getElementById("statRevenueToday").textContent = money(revenueToday);
+  document.getElementById("statInBay").textContent = inBay.length;
+  document.getElementById("statWashedToday").textContent = completedToday.length;
+  document.getElementById("statStaffActive").textContent = activeStaff;
+  document.getElementById("statStaffTotal").textContent = "of " + state.staff.length + " total";
+  updateBayTag();
+
+  // Bay board
+  const board = document.getElementById("bayBoard");
+  document.getElementById("bayCountSub").textContent = inBay.length + " vehicle" + (inBay.length===1?"":"s");
+  board.innerHTML = inBay.length ? inBay.map(j=>`
+    <div class="bay-chip">
+      <div class="plate">${j.plate}</div>
+      <div class="svc">${j.service.name}</div>
+      <div class="time">IN ${fmtTime(j.timeIn)} · ${staffName(j.staffId)}</div>
+    </div>
+  `).join("") : `<div class="empty-note">Bay is empty. No vehicles currently being washed.</div>`;
+
+  renderRevenueChart();
+  renderServiceChart();
+}
+
+function last7Days(){
+  const days = [];
+  for(let i=6;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
+    days.push(d);
+  }
+  return days;
+}
+function renderRevenueChart(){
+  const days = last7Days();
+  const labels = days.map(d=>d.toLocaleDateString([], {weekday:'short'}));
+  const totals = days.map(d=>{
+    return state.jobs.filter(j=>j.paid && j.timeOut && new Date(j.timeOut).toDateString()===d.toDateString())
+      .reduce((s,j)=>s+j.service.price,0);
+  });
+  document.getElementById("weekTotal").textContent = money(totals.reduce((a,b)=>a+b,0)) + " total";
+  const ctx = document.getElementById("revenueChart");
+  if(revenueChart) revenueChart.destroy();
+  revenueChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ data: totals, backgroundColor:'#2DD4BF', borderRadius:6, maxBarThickness:34 }]},
+    options:{
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>money(c.raw)}}},
+      scales:{
+        y:{ ticks:{ color:'#8FA3B8', callback:v=>v>=1000?(v/1000)+'k':v }, grid:{ color:'#28425F' } },
+        x:{ ticks:{ color:'#8FA3B8' }, grid:{ display:false } }
+      }
+    }
+  });
+}
+function renderServiceChart(){
+  const counts = {};
+  state.jobs.forEach(j=>{ counts[j.service.name] = (counts[j.service.name]||0)+1; });
+  const labels = Object.keys(counts);
+  const data = Object.values(counts);
+  const ctx = document.getElementById("serviceChart");
+  if(serviceChart) serviceChart.destroy();
+  if(labels.length===0){
+    ctx.getContext('2d').clearRect(0,0,ctx.width,ctx.height);
+    return;
+  }
+  serviceChart = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:['#2DD4BF','#F5A524','#8FA3B8','#5B8DEF','#F05252','#A78BFA'], borderColor:'#152841', borderWidth:3 }]},
+    options:{ plugins:{ legend:{ position:'bottom', labels:{ color:'#EAF2F8', boxWidth:12, font:{size:11} } } } }
+  });
+}
+
+/* ============ REVENUE VIEW ============ */
+function renderRevenue(){
+  const completed = state.jobs.filter(j=>j.status==="completed");
+  const paidJobs = completed.filter(j=>j.paid);
+  const allTime = paidJobs.reduce((s,j)=>s+j.service.price,0);
+  const avg = paidJobs.length ? allTime/paidJobs.length : 0;
+  const unpaid = state.jobs.filter(j=>!j.paid && j.status==="completed").reduce((s,j)=>s+j.service.price,0);
+
+  document.getElementById("revAllTime").textContent = money(allTime);
+  document.getElementById("revAvg").textContent = money(avg);
+  document.getElementById("revUnpaid").textContent = money(unpaid);
+
+  // 30 day chart
+  const days = [];
+  for(let i=29;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0); days.push(d); }
+  const totals = days.map(d=> state.jobs.filter(j=>j.paid && j.timeOut && new Date(j.timeOut).toDateString()===d.toDateString()).reduce((s,j)=>s+j.service.price,0));
+  document.getElementById("monthTotal").textContent = money(totals.reduce((a,b)=>a+b,0)) + " total";
+  const ctx = document.getElementById("monthChart");
+  if(monthChart) monthChart.destroy();
+  monthChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels: days.map(d=>d.getDate()), datasets:[{ data: totals, borderColor:'#2DD4BF', backgroundColor:'rgba(45,212,191,.15)', fill:true, tension:.35, pointRadius:0, borderWidth:2 }]},
+    options:{ plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>money(c.raw)}}},
+      scales:{ y:{ ticks:{ color:'#8FA3B8', callback:v=>v>=1000?(v/1000)+'k':v }, grid:{color:'#28425F'} }, x:{ ticks:{color:'#8FA3B8'}, grid:{display:false} } } }
+  });
+
+  // top staff
+  const perf = state.staff.map(s=>{
+    const jobs = state.jobs.filter(j=>j.staffId===s.id && j.paid);
+    return { name:s.name, jobs: jobs.length, rev: jobs.reduce((sum,j)=>sum+j.service.price,0) };
+  }).sort((a,b)=>b.rev-a.rev);
+  document.getElementById("topStaffBody").innerHTML = perf.map(p=>`
+    <tr><td>${p.name}</td><td>${p.jobs}</td><td class="mono">${money(p.rev)}</td></tr>
+  `).join("") || `<tr><td colspan="3" class="empty-note">No data yet.</td></tr>`;
+}
+
+/* ============ CLOCK ============ */
+function tickClock(){
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString();
+}
+setInterval(tickClock, 1000);
+
+/* ============ INIT ============ */
+(async function init(){
+  await loadState();
+  populateRegisterForm();
+  tickClock();
+  renderDashboard();
+  updateBayTag();
+})();
+</script>
+</body>
+</html>
