@@ -250,7 +250,7 @@ select{cursor:pointer;}
 @media print{
   body *{visibility:hidden;}
   .ticket, .ticket *{visibility:visible;}
-  .ticket{position:fixed;top:0;left:0;box-shadow:none;}
+  .ticket{position:fixed;top:0;left:0;box-shadow:none;background-image:none;}
   .modal-actions{display:none;}
 }
 
@@ -558,6 +558,30 @@ select{cursor:pointer;}
       </div>
 
       <div class="panel" style="max-width:720px;">
+        <div class="panel-head"><h2>Receipt Printer</h2><span class="sub">for invoices &amp; payment receipts</span></div>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6;">
+          Printing uses your browser's normal print dialog, so it works with <b>any printer already installed on this
+          computer</b> — thermal receipt printers (USB, network or Bluetooth), regular inkjet/laser printers, or
+          "print to PDF". Just pick the correct paper width below so tickets fit your printer's roll, then choose
+          that printer in the dialog when you click Print.
+        </p>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+          <div class="field">
+            <label>Receipt Paper Width</label>
+            <select id="setPaperWidth">
+              <option value="80mm">80mm thermal roll (most common)</option>
+              <option value="58mm">58mm thermal roll (compact)</option>
+              <option value="A4">A4 / Letter sheet (regular printer)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start;margin-top:16px;">
+          <button class="btn btn-primary" onclick="savePrintSettings()">Save Printer Settings</button>
+          <button class="btn" onclick="testPrint()">🖨 Print Test Receipt</button>
+        </div>
+      </div>
+
+      <div class="panel" style="max-width:720px;">
         <div class="panel-head"><h2>Data &amp; Backup</h2><span class="sub" id="storageModeSub">—</span></div>
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6;">
           Your data lives on the server and is shared live across every device that opens this app —
@@ -726,6 +750,7 @@ const DEFAULT_SERVICES = [
   {name:"SUV / Van Full Wash", price:900},
 ];
 const DEFAULT_BUSINESS = { name:"SplashBay", tagline:"Wash Bay Control", phone:"", currency:"KSh" };
+const DEFAULT_PRINT_SETTINGS = { paperWidth: "80mm" }; // "58mm" | "80mm" | "A4"
 
 function freshState(){
   return {
@@ -733,6 +758,7 @@ function freshState(){
     jobs: [],
     services: DEFAULT_SERVICES.map(s=>({...s})),
     business: {...DEFAULT_BUSINESS},
+    printSettings: {...DEFAULT_PRINT_SETTINGS},
     seq: 1000
   };
 }
@@ -768,6 +794,7 @@ async function loadState(){
   state = Object.assign(freshState(), loaded);
   state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
   state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
+  state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, loaded.printSettings||{});
 }
 async function saveState(){
   const res = await fetch("/api/state", { method:"PUT", headers: authHeaders(), body: JSON.stringify(state) });
@@ -805,6 +832,7 @@ async function pollForUpdates(){
     state = Object.assign(freshState(), loaded);
     state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
     state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
+    state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, loaded.printSettings||{});
     applyBusinessBranding();
     const activeBtn = document.querySelector(".nav button.active");
     const activeView = activeBtn ? activeBtn.dataset.view : "dashboard";
@@ -1050,7 +1078,49 @@ function closeReceipt(){
   renderDashboard();
   renderRecords();
 }
-function printCurrentTicket(){ window.print(); }
+/* ---- Printing: applies the correct page size for the configured receipt
+   printer (58mm / 80mm thermal roll, or full A4/Letter sheet) right before
+   handing off to the browser's print dialog, which can target ANY printer
+   installed on the computer — USB, network, or Bluetooth thermal printers
+   included, as long as it's set up as a system printer. ---- */
+function printCssFor(paperWidth){
+  if(paperWidth === "58mm"){
+    return `@page{ size:58mm auto; margin:2mm; }
+      .ticket{ width:52mm !important; font-size:10.5px; padding:10px 8px 8px; }
+      .ticket h3{ font-size:16px; } .ticket-total .v{ font-size:18px; }`;
+  }
+  if(paperWidth === "A4"){
+    return `@page{ size:A4; margin:20mm; }
+      .ticket{ width:340px !important; margin:0 auto; }`;
+  }
+  // default: 80mm thermal receipt roll (most common POS/carwash printer)
+  return `@page{ size:80mm auto; margin:3mm; }
+    .ticket{ width:72mm !important; font-size:12px; padding:14px 10px 10px; }
+    .ticket h3{ font-size:19px; }`;
+}
+function printCurrentTicket(){
+  const paperWidth = (state.printSettings && state.printSettings.paperWidth) || "80mm";
+  let styleEl = document.getElementById("dynPrintStyle");
+  if(!styleEl){
+    styleEl = document.createElement("style");
+    styleEl.id = "dynPrintStyle";
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = "@media print{ " + printCssFor(paperWidth) + " }";
+  window.print();
+}
+function testPrint(){
+  document.getElementById("invBizName").textContent = state.business.name;
+  document.getElementById("invBizTagline").textContent = state.business.tagline || "Printer Test";
+  document.getElementById("invoiceBody").innerHTML = `
+    <div class="ticket-row"><span class="k">Test Print</span><span class="v">Success</span></div>
+    <div class="ticket-row"><span class="k">Paper Width</span><span class="v">${(state.printSettings&&state.printSettings.paperWidth)||"80mm"}</span></div>
+    <div class="ticket-row"><span class="k">Printed</span><span class="v">${new Date().toLocaleString()}</span></div>
+  `;
+  document.getElementById("invTotal").textContent = "Looks good!";
+  document.getElementById("invoiceBackdrop").classList.add("show");
+  document.getElementById("invoiceActionsWrap").style.display="flex";
+}
 
 /* ============ STAFF ============ */
 function openStaffModal(){ document.getElementById("staffModalBackdrop").classList.add("show"); }
@@ -1329,6 +1399,7 @@ function renderSettings(){
   document.getElementById("setBizTagline").value = state.business.tagline || "";
   document.getElementById("setBizPhone").value = state.business.phone || "";
   document.getElementById("setBizCurrency").value = state.business.currency || "KSh";
+  document.getElementById("setPaperWidth").value = (state.printSettings && state.printSettings.paperWidth) || "80mm";
   document.getElementById("storageModeSub").textContent = "saved on the server · shared across all devices";
   renderServicesTable();
 }
@@ -1343,6 +1414,11 @@ async function saveBusinessSettings(){
   applyBusinessBranding();
   renderDashboard();
   alert("Business details saved.");
+}
+async function savePrintSettings(){
+  state.printSettings = { paperWidth: document.getElementById("setPaperWidth").value };
+  await saveState();
+  alert("Printer settings saved. Use \"Print Test Receipt\" to check it looks right.");
 }
 
 function renderServicesTable(){
@@ -1414,6 +1490,7 @@ function importBackup(event){
       state = Object.assign(freshState(), parsed);
       state.services = parsed.services && parsed.services.length ? parsed.services : DEFAULT_SERVICES.map(s=>({...s}));
       state.business = Object.assign({...DEFAULT_BUSINESS}, parsed.business||{});
+      state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, parsed.printSettings||{});
       await saveState();
       applyBusinessBranding();
       renderSettings();
