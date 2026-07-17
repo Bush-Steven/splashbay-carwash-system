@@ -1,0 +1,16 @@
+{
+  "name": "splashbay-carwash-system",
+  "version": "2.0.0",
+  "description": "SplashBay — carwash operations system with an Express backend and shared multi-device data",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -545,8 +545,8 @@ select{cursor:pointer;}
       <div class="panel" style="max-width:720px;">
         <div class="panel-head"><h2>Data &amp; Backup</h2><span class="sub" id="storageModeSub">—</span></div>
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6;">
-          Your data is saved automatically in this browser. Export a backup regularly and store it somewhere safe —
-          clearing your browser data will erase everything if you don't have a backup.
+          Your data lives on the server and is shared live across every device that opens this app —
+          perfect for multiple front-desk terminals. Export a backup regularly and store it somewhere safe.
         </p>
         <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
           <button class="btn" onclick="exportBackup()">⬇ Export Backup (JSON)</button>
@@ -686,6 +686,20 @@ select{cursor:pointer;}
   </div>
 </div>
 
+<!-- LOCK SCREEN -->
+<div class="modal-backdrop" id="lockScreen" style="display:none;background:var(--bg);backdrop-filter:none;">
+  <div class="modal-box" style="width:360px;text-align:center;">
+    <svg viewBox="0 0 24 24" fill="none" style="width:36px;height:36px;margin:0 auto 14px;display:block;"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/></svg>
+    <h3 style="margin-bottom:6px;">Staff Access</h3>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:18px;">Enter the access PIN to open SplashBay</p>
+    <div class="field" style="margin-bottom:8px;">
+      <input id="lockPinInput" type="password" placeholder="Access PIN" style="text-align:center;letter-spacing:3px;font-family:var(--mono);" onkeydown="if(event.key==='Enter') submitPin()">
+    </div>
+    <p id="lockError" style="display:none;color:var(--red);font-size:12.5px;margin-bottom:10px;">Incorrect PIN. Please try again.</p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitPin()">Unlock</button>
+  </div>
+</div>
+
 <script>
 /* ============ DATA ============ */
 const DEFAULT_SERVICES = [
@@ -713,55 +727,82 @@ let currentPayJobId = null;
 let currentTicketId = null; // for print
 let revenueChart, serviceChart, monthChart, staffChart;
 let currentStaffDetailId = null;
-const STORAGE_KEY = "splashbay-data";
+let accessPin = localStorage.getItem("splashbay-pin") || "";
+let pinRequired = false;
 
 /* ============ PERSISTENCE ============
-   Uses the Claude Artifacts storage API when available (window.storage).
-   Falls back to the browser's localStorage when running as a standalone
-   site (e.g. hosted on GitHub Pages), so the app works either way. */
-const hasArtifactStorage = typeof window.storage !== "undefined";
-
-async function storageGet(key){
-  if(hasArtifactStorage){
-    try{ return await window.storage.get(key, false); }
-    catch(e){ return null; }
-  }
-  try{
-    const raw = localStorage.getItem(key);
-    return raw ? { key, value: raw, shared:false } : null;
-  }catch(e){ return null; }
+   Talks to the real Express + JSON-file backend in server.js, so every
+   device/browser hitting this server shares the same live data. */
+function authHeaders(){
+  const h = { "Content-Type":"application/json" };
+  if(accessPin) h["x-access-pin"] = accessPin;
+  return h;
 }
-async function storageSet(key, value){
-  if(hasArtifactStorage){
-    try{ return await window.storage.set(key, value, false); }
-    catch(e){ console.error("Save failed", e); return null; }
-  }
-  try{
-    localStorage.setItem(key, value);
-    return { key, value, shared:false };
-  }catch(e){ console.error("Save failed", e); return null; }
+
+async function checkPinRequirement(){
+  const res = await fetch("/api/ping");
+  const data = await res.json();
+  pinRequired = !!data.pinRequired;
+  return pinRequired;
 }
 
 async function loadState(){
-  try{
-    const res = await storageGet(STORAGE_KEY);
-    if(res && res.value){
-      const loaded = JSON.parse(res.value);
-      // merge with defaults so upgrades don't crash on missing fields
-      state = Object.assign(freshState(), loaded);
-      state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
-      state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
-    } else {
-      state = freshState();
-      await saveState();
-    }
-  }catch(e){
-    state = freshState();
-  }
+  const res = await fetch("/api/state", { headers: authHeaders() });
+  if(res.status === 401){ showLockScreen(); throw new Error("Unauthorized"); }
+  const loaded = await res.json();
+  state = Object.assign(freshState(), loaded);
+  state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
+  state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
 }
 async function saveState(){
-  await storageSet(STORAGE_KEY, JSON.stringify(state));
+  const res = await fetch("/api/state", { method:"PUT", headers: authHeaders(), body: JSON.stringify(state) });
+  if(res.status === 401){ showLockScreen(); throw new Error("Unauthorized"); }
+  if(!res.ok){ console.error("Save failed", await res.text()); }
 }
+
+/* ---- PIN lock screen ---- */
+function showLockScreen(){
+  document.getElementById("lockScreen").style.display = "flex";
+}
+function hideLockScreen(){
+  document.getElementById("lockScreen").style.display = "none";
+}
+async function submitPin(){
+  const val = document.getElementById("lockPinInput").value.trim();
+  accessPin = val;
+  const res = await fetch("/api/state", { headers: authHeaders() });
+  if(res.status === 401){
+    document.getElementById("lockError").style.display = "block";
+    return;
+  }
+  localStorage.setItem("splashbay-pin", accessPin);
+  hideLockScreen();
+  await bootApp();
+}
+
+/* ---- Live sync: pick up changes made from other devices/terminals ---- */
+async function pollForUpdates(){
+  if(document.hidden || pinRequired && !accessPin) return;
+  try{
+    const res = await fetch("/api/state", { headers: authHeaders() });
+    if(!res.ok) return;
+    const loaded = await res.json();
+    state = Object.assign(freshState(), loaded);
+    state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
+    state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
+    applyBusinessBranding();
+    const activeBtn = document.querySelector(".nav button.active");
+    const activeView = activeBtn ? activeBtn.dataset.view : "dashboard";
+    if(["dashboard","bay","staff","records","revenue"].includes(activeView)){
+      if(activeView==="dashboard") renderDashboard();
+      if(activeView==="bay") renderBay();
+      if(activeView==="staff") renderStaff();
+      if(activeView==="records") renderRecords();
+      if(activeView==="revenue") renderRevenue();
+    }
+  }catch(e){ /* offline or server restarting — ignore, will retry */ }
+}
+
 
 function loadSampleData(){
   if(state.jobs.length || state.staff.length){
@@ -1273,9 +1314,7 @@ function renderSettings(){
   document.getElementById("setBizTagline").value = state.business.tagline || "";
   document.getElementById("setBizPhone").value = state.business.phone || "";
   document.getElementById("setBizCurrency").value = state.business.currency || "KSh";
-  document.getElementById("storageModeSub").textContent = hasArtifactStorage
-    ? "saved via Claude Artifacts storage"
-    : "saved in this browser (localStorage)";
+  document.getElementById("storageModeSub").textContent = "saved on the server · shared across all devices";
   renderServicesTable();
 }
 async function saveBusinessSettings(){
@@ -1408,13 +1447,28 @@ function tickClock(){
 setInterval(tickClock, 1000);
 
 /* ============ INIT ============ */
-(async function init(){
+async function bootApp(){
   await loadState();
   applyBusinessBranding();
   populateRegisterForm();
   tickClock();
   renderDashboard();
   updateBayTag();
+}
+(async function init(){
+  try{
+    await checkPinRequirement();
+  }catch(e){ /* server might still be starting up */ }
+  if(pinRequired && !accessPin){
+    showLockScreen();
+    return;
+  }
+  try{
+    await bootApp();
+  }catch(e){
+    // 401 already shows the lock screen from loadState()
+  }
+  setInterval(pollForUpdates, 8000);
 })();
 </script>
 </body>
