@@ -759,7 +759,6 @@ function freshState(){
     services: DEFAULT_SERVICES.map(s=>({...s})),
     business: {...DEFAULT_BUSINESS},
     printSettings: {...DEFAULT_PRINT_SETTINGS},
-    seq: 1000
   };
 }
 
@@ -788,7 +787,7 @@ async function checkPinRequirement(){
 }
 
 async function loadState(){
-  const res = await fetch("/api/state", { headers: authHeaders() });
+  const res = await fetch("/api/bootstrap", { headers: authHeaders() });
   if(res.status === 401){ showLockScreen(); throw new Error("Unauthorized"); }
   const loaded = await res.json();
   state = Object.assign(freshState(), loaded);
@@ -796,10 +795,16 @@ async function loadState(){
   state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
   state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, loaded.printSettings||{});
 }
-async function saveState(){
-  const res = await fetch("/api/state", { method:"PUT", headers: authHeaders(), body: JSON.stringify(state) });
+/* api() — thin helper for talking to the real database-backed REST endpoints */
+async function api(method, url, body){
+  const res = await fetch(url, { method, headers: authHeaders(), body: body!==undefined ? JSON.stringify(body) : undefined });
   if(res.status === 401){ showLockScreen(); throw new Error("Unauthorized"); }
-  if(!res.ok){ console.error("Save failed", await res.text()); }
+  if(!res.ok){
+    let msg = "Request failed";
+    try{ msg = (await res.json()).error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  return res.status === 204 ? null : res.json();
 }
 
 /* ---- PIN lock screen ---- */
@@ -812,7 +817,7 @@ function hideLockScreen(){
 async function submitPin(){
   const val = document.getElementById("lockPinInput").value.trim();
   accessPin = val;
-  const res = await fetch("/api/state", { headers: authHeaders() });
+  const res = await fetch("/api/bootstrap", { headers: authHeaders() });
   if(res.status === 401){
     document.getElementById("lockError").style.display = "block";
     return;
@@ -826,7 +831,7 @@ async function submitPin(){
 async function pollForUpdates(){
   if(document.hidden || pinRequired && !accessPin) return;
   try{
-    const res = await fetch("/api/state", { headers: authHeaders() });
+    const res = await fetch("/api/bootstrap", { headers: authHeaders() });
     if(!res.ok) return;
     const loaded = await res.json();
     state = Object.assign(freshState(), loaded);
@@ -847,28 +852,20 @@ async function pollForUpdates(){
 }
 
 
-function loadSampleData(){
+async function loadSampleData(){
   if(state.jobs.length || state.staff.length){
     if(!confirm("This adds sample staff and jobs alongside your existing data. Continue?")) return;
   }
-  const now = Date.now();
-  const s1 = state.seq++, s2 = state.seq++, s3 = state.seq++;
-  state.staff.push(
-    {id:s1, name:"Brian Otieno", role:"Washer", phone:"0722 111 222", status:"active"},
-    {id:s2, name:"Faith Mwangi", role:"Detailer", phone:"0733 222 333", status:"active"},
-    {id:s3, name:"Kevin Njoroge", role:"Supervisor", phone:"0711 444 555", status:"off"},
-  );
-  state.jobs.push(
-    mkJob({customer:"Alice Chebet", phone:"0700111222", plate:"KDA 245B", model:"Toyota Axio, Silver", service:state.services[1], staffId:s1, timeIn: now - 86400000, timeOut: now - 86400000 + 3600000, status:"completed", paid:true, method:"Cash"}),
-    mkJob({customer:"Moses Kiptoo", phone:"0700333444", plate:"KCB 998J", model:"Subaru Forester, Blue", service:state.services[2], staffId:s2, timeIn: now - 3600000*5, timeOut: now - 3600000*4, status:"completed", paid:true, method:"M-Pesa"}),
-  );
-  saveState().then(()=>{ switchView("dashboard"); });
-}
-function mkJob(o){
-  const id = state.seq++;
-  return Object.assign({
-    id, invoiceNo: "INV-" + id, receiptNo: null,
-  }, o);
+  try{
+    const fresh = await api("POST", "/api/sample-data");
+    state = Object.assign(freshState(), fresh);
+    state.services = fresh.services && fresh.services.length ? fresh.services : DEFAULT_SERVICES.map(s=>({...s}));
+    state.business = Object.assign({...DEFAULT_BUSINESS}, fresh.business||{});
+    state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, fresh.printSettings||{});
+    switchView("dashboard");
+  }catch(e){
+    alert("Couldn't load sample data: " + e.message);
+  }
 }
 
 /* ============ NAV ============ */
@@ -921,7 +918,7 @@ function staffName(id){ const s = state.staff.find(s=>s.id===id); return s ? s.n
 function populateRegisterForm(){
   const svcSel = document.getElementById("fService");
   svcSel.innerHTML = state.services.length
-    ? state.services.map((s,i)=>`<option value="${i}">${s.name} — ${money(s.price)}</option>`).join("")
+    ? state.services.map(s=>`<option value="${s.id}">${s.name} — ${money(s.price)}</option>`).join("")
     : `<option value="">No services configured — add one in Settings</option>`;
   const staffSel = document.getElementById("fStaff");
   const activeStaff = state.staff.filter(s=>s.status==="active");
@@ -932,9 +929,9 @@ function populateRegisterForm(){
 }
 document.getElementById("fService")?.addEventListener("change", updatePricePreview);
 function updatePricePreview(){
-  const idx = document.getElementById("fService").value;
-  const price = state.services[idx] ? state.services[idx].price : 0;
-  document.getElementById("fPricePreview").textContent = money(price);
+  const id = Number(document.getElementById("fService").value);
+  const service = state.services.find(s=>s.id===id);
+  document.getElementById("fPricePreview").textContent = money(service ? service.price : 0);
 }
 function clearRegisterForm(){
   ["fCustomer","fPhone","fPlate","fModel"].forEach(id=>document.getElementById(id).value="");
@@ -946,26 +943,22 @@ async function registerCar(){
   const phone = document.getElementById("fPhone").value.trim();
   const plate = document.getElementById("fPlate").value.trim().toUpperCase();
   const model = document.getElementById("fModel").value.trim();
-  const svcIdx = document.getElementById("fService").value;
+  const serviceId = document.getElementById("fService").value;
   const staffId = document.getElementById("fStaff").value;
 
-  if(!customer || !plate || svcIdx==="" || !staffId){
+  if(!customer || !plate || !serviceId || !staffId){
     alert("Please fill in customer name, plate number, service and assign a staff member.");
     return;
   }
-  const service = state.services[svcIdx];
-  if(!service){ alert("Please add at least one service in Settings first."); return; }
-  const job = mkJob({
-    customer, phone, plate, model,
-    service, staffId:Number(staffId),
-    timeIn: Date.now(), timeOut:null,
-    status:"in-bay", paid:false, method:null
-  });
-  state.jobs.push(job);
-  await saveState();
-  clearRegisterForm();
-  openInvoice(job.id);
-  updateBayTag();
+  try{
+    const job = await api("POST", "/api/jobs", { customer, phone, plate, model, serviceId: Number(serviceId), staffId: Number(staffId) });
+    state.jobs.push(job);
+    clearRegisterForm();
+    openInvoice(job.id);
+    updateBayTag();
+  }catch(e){
+    alert("Couldn't register the vehicle: " + e.message);
+  }
 }
 
 /* ============ BAY / CHECKOUT ============ */
@@ -993,11 +986,15 @@ function renderBay(){
 }
 async function cancelJob(jobId){
   if(!confirm("Cancel this check-in? This removes it completely (use this to fix a mistaken registration).")) return;
-  state.jobs = state.jobs.filter(j=>j.id!==jobId);
-  await saveState();
-  renderBay();
-  updateBayTag();
-  renderDashboard();
+  try{
+    await api("DELETE", "/api/jobs/" + jobId);
+    state.jobs = state.jobs.filter(j=>j.id!==jobId);
+    renderBay();
+    updateBayTag();
+    renderDashboard();
+  }catch(e){
+    alert("Couldn't cancel: " + e.message);
+  }
 }
 
 function openPayModal(jobId){
@@ -1015,16 +1012,17 @@ function closePayModal(){ document.getElementById("payModalBackdrop").classList.
 async function confirmCheckout(){
   const j = state.jobs.find(j=>j.id===currentPayJobId);
   if(!j) return;
-  j.timeOut = Date.now();
-  j.status = "completed";
-  j.paid = true;
-  j.method = document.getElementById("payMethod").value;
-  j.receiptNo = "RCT-" + (state.seq++);
-  await saveState();
-  closePayModal();
-  openReceipt(j.id);
-  renderBay();
-  updateBayTag();
+  const method = document.getElementById("payMethod").value;
+  try{
+    const updated = await api("POST", "/api/jobs/" + j.id + "/checkout", { method });
+    Object.assign(j, updated);
+    closePayModal();
+    openReceipt(j.id);
+    renderBay();
+    updateBayTag();
+  }catch(e){
+    alert("Couldn't complete checkout: " + e.message);
+  }
 }
 
 /* ============ INVOICE / RECEIPT TICKETS ============ */
@@ -1133,22 +1131,40 @@ async function addStaff(){
   const role = document.getElementById("sRole").value;
   const phone = document.getElementById("sPhone").value.trim();
   if(!name){ alert("Please enter the staff member's name."); return; }
-  state.staff.push({ id: state.seq++, name, role, phone, status:"active" });
-  await saveState();
-  closeStaffModal();
-  renderStaff();
+  try{
+    const staff = await api("POST", "/api/staff", { name, role, phone });
+    state.staff.push(staff);
+    closeStaffModal();
+    renderStaff();
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't add staff: " + e.message);
+  }
 }
 async function toggleStaffStatus(id){
   const s = state.staff.find(s=>s.id===id);
-  s.status = s.status==="active" ? "off" : "active";
-  await saveState();
-  renderStaff();
+  const newStatus = s.status==="active" ? "off" : "active";
+  try{
+    const updated = await api("PATCH", "/api/staff/" + id, { status: newStatus });
+    Object.assign(s, updated);
+    renderStaff();
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't update staff: " + e.message);
+  }
 }
 async function removeStaff(id){
   if(!confirm("Remove this staff member? Their past job records will be kept.")) return;
-  state.staff = state.staff.filter(s=>s.id!==id);
-  await saveState();
-  renderStaff();
+  try{
+    await api("DELETE", "/api/staff/" + id);
+    state.staff = state.staff.filter(s=>s.id!==id);
+    // mirror the database's ON DELETE SET NULL so past jobs show "Unassigned" immediately
+    state.jobs.forEach(j=>{ if(j.staffId===id) j.staffId=null; });
+    renderStaff();
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't remove staff: " + e.message);
+  }
 }
 function renderStaff(){
   const body = document.getElementById("staffTableBody");
@@ -1262,10 +1278,14 @@ function renderRecords(){
 }
 async function deleteRecord(jobId){
   if(!confirm("Permanently delete this record? This cannot be undone.")) return;
-  state.jobs = state.jobs.filter(j=>j.id!==jobId);
-  await saveState();
-  renderRecords();
-  renderDashboard();
+  try{
+    await api("DELETE", "/api/jobs/" + jobId);
+    state.jobs = state.jobs.filter(j=>j.id!==jobId);
+    renderRecords();
+    renderDashboard();
+  }catch(e){
+    alert("Couldn't delete: " + e.message);
+  }
 }
 
 /* ============ DASHBOARD ============ */
@@ -1404,48 +1424,75 @@ function renderSettings(){
   renderServicesTable();
 }
 async function saveBusinessSettings(){
-  state.business = {
-    name: document.getElementById("setBizName").value.trim() || "SplashBay",
-    tagline: document.getElementById("setBizTagline").value.trim(),
-    phone: document.getElementById("setBizPhone").value.trim(),
-    currency: document.getElementById("setBizCurrency").value.trim() || "KSh",
-  };
-  await saveState();
-  applyBusinessBranding();
-  renderDashboard();
-  alert("Business details saved.");
+  try{
+    const business = await api("PUT", "/api/business", {
+      name: document.getElementById("setBizName").value.trim() || "SplashBay",
+      tagline: document.getElementById("setBizTagline").value.trim(),
+      phone: document.getElementById("setBizPhone").value.trim(),
+      currency: document.getElementById("setBizCurrency").value.trim() || "KSh",
+    });
+    state.business = business;
+    applyBusinessBranding();
+    renderDashboard();
+    alert("Business details saved.");
+  }catch(e){
+    alert("Couldn't save business details: " + e.message);
+  }
 }
 async function savePrintSettings(){
-  state.printSettings = { paperWidth: document.getElementById("setPaperWidth").value };
-  await saveState();
-  alert("Printer settings saved. Use \"Print Test Receipt\" to check it looks right.");
+  try{
+    const printSettings = await api("PUT", "/api/print-settings", { paperWidth: document.getElementById("setPaperWidth").value });
+    state.printSettings = printSettings;
+    alert("Printer settings saved. Use \"Print Test Receipt\" to check it looks right.");
+  }catch(e){
+    alert("Couldn't save printer settings: " + e.message);
+  }
 }
 
 function renderServicesTable(){
   const body = document.getElementById("servicesTableBody");
-  body.innerHTML = state.services.map((s,i)=>`
+  body.innerHTML = state.services.map(s=>`
     <tr>
-      <td><input value="${s.name.replace(/"/g,'&quot;')}" onchange="updateServiceName(${i}, this.value)"></td>
-      <td style="width:140px;"><input type="number" min="0" value="${s.price}" onchange="updateServicePrice(${i}, this.value)"></td>
-      <td><button class="btn btn-sm btn-danger" onclick="removeService(${i})">Remove</button></td>
+      <td><input value="${s.name.replace(/"/g,'&quot;')}" onchange="updateServiceName(${s.id}, this.value)"></td>
+      <td style="width:140px;"><input type="number" min="0" value="${s.price}" onchange="updateServicePrice(${s.id}, this.value)"></td>
+      <td><button class="btn btn-sm btn-danger" onclick="removeService(${s.id})">Remove</button></td>
     </tr>
   `).join("") || `<tr><td colspan="3" class="empty-note">No services yet — add one below.</td></tr>`;
 }
-async function updateServiceName(i, val){
-  state.services[i].name = val.trim() || state.services[i].name;
-  await saveState();
+async function updateServiceName(id, val){
+  const s = state.services.find(s=>s.id===id);
+  if(!val.trim()) return;
+  try{
+    const updated = await api("PATCH", "/api/services/" + id, { name: val.trim() });
+    Object.assign(s, updated);
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't update service: " + e.message);
+  }
 }
-async function updateServicePrice(i, val){
+async function updateServicePrice(id, val){
+  const s = state.services.find(s=>s.id===id);
   const price = Number(val);
-  state.services[i].price = isNaN(price) || price < 0 ? state.services[i].price : price;
-  await saveState();
-  renderServicesTable();
+  if(isNaN(price) || price < 0){ renderServicesTable(); return; }
+  try{
+    const updated = await api("PATCH", "/api/services/" + id, { price });
+    Object.assign(s, updated);
+    renderServicesTable();
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't update service: " + e.message);
+  }
 }
-async function removeService(i){
+async function removeService(id){
   if(!confirm("Remove this service? Past jobs keep their recorded price either way.")) return;
-  state.services.splice(i,1);
-  await saveState();
-  renderServicesTable();
+  try{
+    await api("DELETE", "/api/services/" + id);
+    state.services = state.services.filter(s=>s.id!==id);
+    renderServicesTable();
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't remove service: " + e.message);
+  }
 }
 async function addService(){
   const name = document.getElementById("newSvcName").value.trim();
@@ -1454,11 +1501,16 @@ async function addService(){
     alert("Please enter a valid service name and price.");
     return;
   }
-  state.services.push({name, price});
-  document.getElementById("newSvcName").value = "";
-  document.getElementById("newSvcPrice").value = "";
-  await saveState();
-  renderServicesTable();
+  try{
+    const service = await api("POST", "/api/services", { name, price });
+    state.services.push(service);
+    document.getElementById("newSvcName").value = "";
+    document.getElementById("newSvcPrice").value = "";
+    renderServicesTable();
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't add service: " + e.message);
+  }
 }
 
 /* ---- Backup / restore / export ---- */
@@ -1487,17 +1539,18 @@ function importBackup(event){
         return;
       }
       if(!confirm("Importing will replace ALL current data with this backup. Continue?")) return;
-      state = Object.assign(freshState(), parsed);
-      state.services = parsed.services && parsed.services.length ? parsed.services : DEFAULT_SERVICES.map(s=>({...s}));
-      state.business = Object.assign({...DEFAULT_BUSINESS}, parsed.business||{});
-      state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, parsed.printSettings||{});
-      await saveState();
+      const restored = await api("POST", "/api/import", parsed);
+      state = Object.assign(freshState(), restored);
+      state.services = restored.services && restored.services.length ? restored.services : DEFAULT_SERVICES.map(s=>({...s}));
+      state.business = Object.assign({...DEFAULT_BUSINESS}, restored.business||{});
+      state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, restored.printSettings||{});
       applyBusinessBranding();
       renderSettings();
       renderDashboard();
+      populateRegisterForm();
       alert("Backup imported successfully.");
     }catch(err){
-      alert("Couldn't read that file. Please choose a valid SplashBay backup JSON file.");
+      alert("Couldn't import that file: " + err.message);
     }
     event.target.value = "";
   };
@@ -1524,12 +1577,19 @@ function exportRecordsCSV(){
 async function resetAllData(){
   if(!confirm("This permanently deletes ALL staff, jobs, invoices and receipts. This cannot be undone. Continue?")) return;
   if(!confirm("Are you absolutely sure? Consider exporting a backup first.")) return;
-  state = freshState();
-  await saveState();
-  applyBusinessBranding();
-  renderSettings();
-  renderDashboard();
-  populateRegisterForm();
+  try{
+    const fresh = await api("POST", "/api/reset");
+    state = Object.assign(freshState(), fresh);
+    state.services = fresh.services && fresh.services.length ? fresh.services : DEFAULT_SERVICES.map(s=>({...s}));
+    state.business = Object.assign({...DEFAULT_BUSINESS}, fresh.business||{});
+    state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, fresh.printSettings||{});
+    applyBusinessBranding();
+    renderSettings();
+    renderDashboard();
+    populateRegisterForm();
+  }catch(e){
+    alert("Couldn't reset data: " + e.message);
+  }
 }
 
 /* ============ CLOCK ============ */

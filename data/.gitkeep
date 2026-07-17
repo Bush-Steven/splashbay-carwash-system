@@ -1,4 +1,0 @@
-# This file ensures the data/ directory is tracked by git.
-# The actual state.json is gitignored (see .gitignore).
-# On Railway, attach a persistent Volume mounted at /app/data
-# so that state.json survives redeployments and restarts.
