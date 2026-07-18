@@ -12,7 +12,7 @@ A complete carwash management system with a real **Node/Express backend** backed
 - **Settings** — business name/phone/currency (shown on every invoice & receipt), editable service catalog & prices, JSON backup export/import, CSV export for accounting, sample data loader, full reset
 - **Receipt Printer** — configurable paper width (58mm / 80mm thermal, or A4), works with any printer already installed on the computer
 - **Shared live data** — every open tab/device polls the server every few seconds, so a check-in on one terminal shows up on another automatically
-- **Optional PIN lock** — protect the whole app with a shared access PIN
+- **Two login roles — Staff & Admin** — separate PINs with different access. Staff can operate the Dashboard, New Registration, Active Bay, and Invoices & Receipts. Admin gets all of that plus Staff management, Revenue Reports, and Settings. Managed entirely from Settings → Access & Roles, no redeploy needed.
 
 ## Database
 Data is stored in a real **SQLite database** (`data/splashbay.db`), managed with [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — no separate database server to install or run.
@@ -53,6 +53,7 @@ splashbay-app/
 | `DELETE /api/jobs/:id` | cancel/delete a job record |
 | `PUT /api/business` | update business details |
 | `PUT /api/print-settings` | update receipt paper width |
+| `GET /api/auth-settings` / `PUT /api/auth-settings` | (admin only) view/set the Staff & Admin PINs |
 | `GET /api/export` / `POST /api/import` | full JSON backup / restore |
 | `POST /api/reset` | wipe everything back to defaults |
 | `POST /api/sample-data` | load example staff & jobs |
@@ -67,13 +68,14 @@ npm start
 
 Then open **http://localhost:3000**. The database file is created automatically at `data/splashbay.db` on first run.
 
-### Enabling the PIN lock (optional but recommended before deploying publicly)
-```bash
-cp .env.example .env
-# edit .env and set ACCESS_PIN=yourpin
-npm start
-```
-If `ACCESS_PIN` is left blank, the app opens with no login step at all.
+### Setting up Staff & Admin logins (recommended before deploying publicly)
+Open the app, go to **Settings → Access & Roles**, and set an Admin PIN (and optionally a Staff PIN). That's it — no environment variables or redeploy needed. Rules:
+- Leave both blank → the app is fully open, no login screen (good for local/dev use).
+- Set only an **Admin PIN** → everyone who knows it gets full access (like the old single-PIN mode).
+- Set both → people choose **Staff** or **Admin** on the login screen. Staff PIN unlocks Dashboard, New Registration, Active Bay, and Invoices & Receipts. Admin PIN unlocks everything, including Staff management, Revenue Reports, and Settings.
+- You can't set a Staff PIN without an Admin PIN first — that's a safety guard so you can never lock yourself out of Settings.
+
+For convenience, the legacy `ACCESS_PIN` environment variable (from earlier versions) still works as a fallback Admin PIN until you set one in Settings.
 
 ## Deploying so your whole team can use it
 Any standard Node hosting works.
@@ -82,7 +84,7 @@ Any standard Node hosting works.
 1. Push this project to GitHub (already done if you're reading this from the repo).
 2. New → Web Service → connect the repo.
 3. Build command: `npm install`. Start command: `npm start`.
-4. Add an environment variable `ACCESS_PIN` if you want the lock screen.
+4. PINs are set from inside the app (Settings → Access & Roles) once it's running — no environment variable needed.
 5. Add a **persistent disk** mounted at the app's `data/` folder — otherwise `splashbay.db` may reset on redeploy on free tiers without a disk.
 
 **Railway.app / Fly.io** — same idea: point it at this repo, `npm install` + `npm start`, attach a small persistent volume for the `data/` folder.
@@ -92,10 +94,10 @@ Any standard Node hosting works.
 git clone <your repo url>
 cd splashbay-carwash-system
 npm install
-cp .env.example .env   # set ACCESS_PIN
 npm install -g pm2
 pm2 start server.js --name splashbay
 ```
+Then set your PINs from Settings → Access & Roles once it's up.
 
 ⚠️ Wherever you deploy, make sure the `data/` folder is on **persistent storage** (not a container's ephemeral filesystem) or your business data will vanish on every redeploy/restart.
 

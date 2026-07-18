@@ -25,6 +25,12 @@ CREATE TABLE IF NOT EXISTS print_settings (
   paper_width TEXT NOT NULL DEFAULT '80mm'
 );
 
+CREATE TABLE IF NOT EXISTS auth_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  admin_pin TEXT,
+  staff_pin TEXT
+);
+
 CREATE TABLE IF NOT EXISTS staff (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -88,6 +94,9 @@ if (!db.prepare('SELECT id FROM business WHERE id = 1').get()) {
 }
 if (!db.prepare('SELECT id FROM print_settings WHERE id = 1').get()) {
   db.prepare(`INSERT INTO print_settings (id, paper_width) VALUES (1, '80mm')`).run();
+}
+if (!db.prepare('SELECT id FROM auth_settings WHERE id = 1').get()) {
+  db.prepare(`INSERT INTO auth_settings (id, admin_pin, staff_pin) VALUES (1, NULL, NULL)`).run();
 }
 if (db.prepare('SELECT COUNT(*) c FROM services').get().c === 0) {
   const insert = db.prepare('INSERT INTO services (name, price) VALUES (?, ?)');

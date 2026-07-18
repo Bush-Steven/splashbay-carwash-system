@@ -627,6 +627,30 @@ select{cursor:pointer;}
       </div>
 
       <div class="panel" style="max-width:720px;">
+        <div class="panel-head"><h2>Access &amp; Roles</h2><span class="sub" id="authStatusSub">—</span></div>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6;">
+          Set up two login PINs so front-line staff and the business owner see different things.
+          <b>Staff PIN</b> unlocks Dashboard, New Registration, Active Bay and Invoices &amp; Receipts only.
+          <b>Admin PIN</b> unlocks everything, including Staff management, Revenue Reports and Settings.
+          Leave both blank for open access with no login screen at all.
+        </p>
+        <div class="form-grid">
+          <div class="field">
+            <label>Admin PIN <span id="adminPinStatus" style="color:var(--text-dim);font-weight:400;"></span></label>
+            <input id="setAdminPin" type="password" placeholder="Leave blank to keep current">
+          </div>
+          <div class="field">
+            <label>Staff PIN <span id="staffPinStatus" style="color:var(--text-dim);font-weight:400;"></span></label>
+            <input id="setStaffPin" type="password" placeholder="Leave blank to keep current">
+          </div>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start;margin-top:16px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="saveAuthSettings()">Save PINs</button>
+          <button class="btn btn-danger" onclick="clearAllPins()">Remove All PINs (Open Access)</button>
+        </div>
+      </div>
+
+      <div class="panel" style="max-width:720px;">
         <div class="panel-head"><h2>Data &amp; Backup</h2><span class="sub" id="storageModeSub">—</span></div>
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6;">
           Your data lives on the server and is shared live across every device that opens this app —
@@ -774,15 +798,25 @@ select{cursor:pointer;}
 
 <!-- LOCK SCREEN -->
 <div class="modal-backdrop" id="lockScreen" style="display:none;">
-  <div class="modal-box" style="width:360px;text-align:center;background:rgba(21,40,65,.88);backdrop-filter:blur(6px);border-color:rgba(45,212,191,.25);">
+  <div class="modal-box" id="roleChoiceBox" style="width:360px;text-align:center;background:rgba(21,40,65,.88);backdrop-filter:blur(6px);border-color:rgba(45,212,191,.25);">
     <svg viewBox="0 0 24 24" fill="none" style="width:36px;height:36px;margin:0 auto 14px;display:block;"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/></svg>
-    <h3 style="margin-bottom:6px;">Staff Access</h3>
-    <p style="color:var(--text-dim);font-size:13px;margin-bottom:18px;">Enter the access PIN to open SplashBay</p>
+    <h3 style="margin-bottom:6px;" id="roleChoiceBizName">SplashBay</h3>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:20px;">Who's logging in?</p>
+    <div class="modal-actions" style="flex-direction:column;gap:10px;">
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="chooseRole('staff')">👷 Staff Login</button>
+      <button class="btn" style="width:100%;justify-content:center;" onclick="chooseRole('admin')">🔑 Admin Login</button>
+    </div>
+  </div>
+  <div class="modal-box" id="pinEntryBox" style="display:none;width:360px;text-align:center;background:rgba(21,40,65,.88);backdrop-filter:blur(6px);border-color:rgba(45,212,191,.25);">
+    <svg viewBox="0 0 24 24" fill="none" style="width:36px;height:36px;margin:0 auto 14px;display:block;"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/></svg>
+    <h3 style="margin-bottom:6px;" id="pinEntryTitle">Staff Access</h3>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:18px;">Enter your PIN to continue</p>
     <div class="field" style="margin-bottom:8px;">
-      <input id="lockPinInput" type="password" placeholder="Access PIN" style="text-align:center;letter-spacing:3px;font-family:var(--mono);" onkeydown="if(event.key==='Enter') submitPin()">
+      <input id="lockPinInput" type="password" placeholder="PIN" style="text-align:center;letter-spacing:3px;font-family:var(--mono);" onkeydown="if(event.key==='Enter') submitPin()">
     </div>
     <p id="lockError" style="display:none;color:var(--red);font-size:12.5px;margin-bottom:10px;">Incorrect PIN. Please try again.</p>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitPin()">Unlock</button>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:8px;" onclick="submitPin()">Unlock</button>
+    <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="backToRoleChoice()">&larr; Back</button>
   </div>
 </div>
 
@@ -815,7 +849,10 @@ let currentTicketId = null; // for print
 let revenueChart, serviceChart, monthChart, staffChart;
 let currentStaffDetailId = null;
 let accessPin = localStorage.getItem("splashbay-pin") || "";
+let currentRole = localStorage.getItem("splashbay-role") || null;
+let pendingRole = null;
 let pinRequired = false;
+let staffLoginEnabled = false;
 
 /* ============ PERSISTENCE ============
    Talks to the real Express + JSON-file backend in server.js, so every
@@ -830,6 +867,7 @@ async function checkPinRequirement(){
   const res = await fetch("/api/ping");
   const data = await res.json();
   pinRequired = !!data.pinRequired;
+  staffLoginEnabled = !!data.staffLoginEnabled;
   return pinRequired;
 }
 
@@ -841,12 +879,18 @@ async function loadState(){
   state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
   state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
   state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, loaded.printSettings||{});
+  if(loaded.role){ currentRole = loaded.role; localStorage.setItem("splashbay-role", currentRole); }
   lastSyncTime = Date.now();
 }
 /* api() — thin helper for talking to the real database-backed REST endpoints */
 async function api(method, url, body){
   const res = await fetch(url, { method, headers: authHeaders(), body: body!==undefined ? JSON.stringify(body) : undefined });
   if(res.status === 401){ showLockScreen(); throw new Error("Unauthorized"); }
+  if(res.status === 403){
+    let msg = "Admin access is required for this action.";
+    try{ msg = (await res.json()).error || msg; }catch(e){}
+    throw new Error(msg);
+  }
   if(!res.ok){
     let msg = "Request failed";
     try{ msg = (await res.json()).error || msg; }catch(e){}
@@ -855,24 +899,69 @@ async function api(method, url, body){
   return res.status === 204 ? null : res.json();
 }
 
-/* ---- PIN lock screen ---- */
+/* ---- Role-choice + PIN lock screen ---- */
 function showLockScreen(){
   document.getElementById("lockScreen").style.display = "flex";
+  if(staffLoginEnabled){
+    document.getElementById("roleChoiceBox").style.display = "block";
+    document.getElementById("pinEntryBox").style.display = "none";
+  } else {
+    // only an admin PIN is configured (legacy single-PIN mode) — skip the role picker
+    pendingRole = "admin";
+    document.getElementById("roleChoiceBox").style.display = "none";
+    document.getElementById("pinEntryBox").style.display = "block";
+    document.getElementById("pinEntryTitle").textContent = "Enter Access PIN";
+  }
+  document.getElementById("roleChoiceBizName").textContent = (state.business && state.business.name) || "SplashBay";
 }
 function hideLockScreen(){
   document.getElementById("lockScreen").style.display = "none";
+}
+function chooseRole(role){
+  pendingRole = role;
+  document.getElementById("roleChoiceBox").style.display = "none";
+  document.getElementById("pinEntryBox").style.display = "block";
+  document.getElementById("pinEntryTitle").textContent = role === "admin" ? "Admin Access" : "Staff Access";
+  document.getElementById("lockError").style.display = "none";
+  document.getElementById("lockPinInput").value = "";
+  setTimeout(()=>document.getElementById("lockPinInput").focus(), 50);
+}
+function backToRoleChoice(){
+  document.getElementById("roleChoiceBox").style.display = "block";
+  document.getElementById("pinEntryBox").style.display = "none";
+  document.getElementById("lockPinInput").value = "";
+  document.getElementById("lockError").style.display = "none";
 }
 async function submitPin(){
   const val = document.getElementById("lockPinInput").value.trim();
   accessPin = val;
   const res = await fetch("/api/bootstrap", { headers: authHeaders() });
   if(res.status === 401){
+    document.getElementById("lockError").textContent = "Incorrect PIN. Please try again.";
     document.getElementById("lockError").style.display = "block";
     return;
   }
+  const data = await res.json();
+  if(pendingRole && data.role !== pendingRole){
+    document.getElementById("lockError").textContent = "That PIN isn't valid for " + (pendingRole==="admin"?"Admin":"Staff") + " login.";
+    document.getElementById("lockError").style.display = "block";
+    return;
+  }
+  currentRole = data.role;
   localStorage.setItem("splashbay-pin", accessPin);
+  localStorage.setItem("splashbay-role", currentRole);
   hideLockScreen();
   await bootApp();
+}
+/* ---- Apply role-based nav visibility (admin sees everything; staff is operational-only) ---- */
+const ADMIN_ONLY_VIEWS = ["staff","revenue","settings"];
+function applyRoleVisibility(){
+  const isAdmin = currentRole !== "staff";
+  document.querySelectorAll(".nav button[data-view]").forEach(btn=>{
+    if(ADMIN_ONLY_VIEWS.includes(btn.dataset.view)){
+      btn.style.display = isAdmin ? "" : "none";
+    }
+  });
 }
 
 /* ---- Refresh whatever the person is currently looking at ---- */
@@ -913,12 +1002,18 @@ async function pollForUpdates(){
   if(document.hidden || (pinRequired && !accessPin)) return;
   try{
     const res = await fetch("/api/bootstrap", { headers: authHeaders() });
+    if(res.status === 401){ showLockScreen(); return; }
     if(!res.ok) return;
     const loaded = await res.json();
     state = Object.assign(freshState(), loaded);
     state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
     state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
     state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, loaded.printSettings||{});
+    if(loaded.role && loaded.role !== currentRole){
+      currentRole = loaded.role;
+      localStorage.setItem("splashbay-role", currentRole);
+      applyRoleVisibility();
+    }
     applyBusinessBranding();
     lastSyncTime = Date.now();
     refreshActiveView();
@@ -944,6 +1039,9 @@ async function loadSampleData(){
 
 /* ============ NAV ============ */
 function switchView(name){
+  if(currentRole === "staff" && ADMIN_ONLY_VIEWS.includes(name)){
+    name = "dashboard";
+  }
   document.querySelectorAll(".view").forEach(v=>v.style.display="none");
   document.getElementById("view-"+name).style.display="block";
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===name));
@@ -1514,6 +1612,49 @@ function renderSettings(){
   document.getElementById("removeLogoBtn").style.display = logo ? "inline-flex" : "none";
   if(logo) document.getElementById("logoPreviewImg").src = logo;
   renderServicesTable();
+  loadAuthStatus();
+}
+async function loadAuthStatus(){
+  try{
+    const status = await api("GET", "/api/auth-settings");
+    document.getElementById("adminPinStatus").textContent = status.adminPinSet ? "(currently set)" : "(not set)";
+    document.getElementById("staffPinStatus").textContent = status.staffPinSet ? "(currently set)" : "(not set)";
+    document.getElementById("authStatusSub").textContent = (status.adminPinSet || status.staffPinSet) ? "login required" : "open access, no login";
+  }catch(e){
+    document.getElementById("authStatusSub").textContent = "—";
+  }
+}
+async function saveAuthSettings(){
+  const adminPin = document.getElementById("setAdminPin").value.trim();
+  const staffPin = document.getElementById("setStaffPin").value.trim();
+  if(!adminPin && !staffPin){
+    alert("Enter a PIN in at least one field to save, or use \"Remove All PINs\" to disable login entirely.");
+    return;
+  }
+  try{
+    const body = {};
+    if(adminPin) body.adminPin = adminPin;
+    if(staffPin) body.staffPin = staffPin;
+    await api("PUT", "/api/auth-settings", body);
+    document.getElementById("setAdminPin").value = "";
+    document.getElementById("setStaffPin").value = "";
+    await loadAuthStatus();
+    alert("PINs saved. Staff and Admin will need to use the new PIN(s) next time they log in.");
+  }catch(e){
+    alert("Couldn't save PINs: " + e.message);
+  }
+}
+async function clearAllPins(){
+  if(!confirm("Remove all PINs? The app will be open with full access to anyone who can reach it — no login screen.")) return;
+  try{
+    await api("PUT", "/api/auth-settings", { clearAdminPin: true, clearStaffPin: true });
+    document.getElementById("setAdminPin").value = "";
+    document.getElementById("setStaffPin").value = "";
+    await loadAuthStatus();
+    alert("All PINs removed. The app now opens with full access, no login required.");
+  }catch(e){
+    alert("Couldn't remove PINs: " + e.message);
+  }
 }
 function resizeImageFile(file, maxSize){
   return new Promise((resolve, reject)=>{
@@ -1750,6 +1891,7 @@ setInterval(tickClock, 1000);
 async function bootApp(){
   await loadState();
   applyBusinessBranding();
+  applyRoleVisibility();
   populateRegisterForm();
   tickClock();
   renderDashboard();

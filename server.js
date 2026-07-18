@@ -4,19 +4,53 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ACCESS_PIN = process.env.ACCESS_PIN || '';
+// Legacy env-var fallback: if no Admin PIN has been set in the app yet (Settings > Access & Roles),
+// but ACCESS_PIN is set in the environment, honor it as the admin PIN until one is configured in-app.
+const LEGACY_ADMIN_PIN = process.env.ACCESS_PIN || '';
 
 app.use(express.json({ limit: '5mb' }));
 
-/* ============ AUTH ============ */
+/* ============ AUTH ============
+   PINs live in the database (auth_settings table) so the business owner can manage
+   them from Settings > Access & Roles without redeploying. Two roles:
+   - "admin": full access — staff management, revenue reports, settings, backups
+   - "staff": operational only — dashboard, registration, active bay, invoices/receipts
+   If no PINs are configured at all, the app is open with full (admin) access — the same
+   zero-config behavior as before. */
+function getAuthSettings() {
+  const row = db.prepare('SELECT * FROM auth_settings WHERE id = 1').get();
+  const adminPin = (row && row.admin_pin) || LEGACY_ADMIN_PIN || '';
+  const staffPin = (row && row.staff_pin) || '';
+  return { adminPin, staffPin };
+}
+
 app.get('/api/ping', (req, res) => {
-  res.json({ ok: true, pinRequired: !!ACCESS_PIN });
+  const { adminPin, staffPin } = getAuthSettings();
+  res.json({ ok: true, pinRequired: !!(adminPin || staffPin), staffLoginEnabled: !!staffPin });
 });
+
+function roleForPin(pin) {
+  const { adminPin, staffPin } = getAuthSettings();
+  if (adminPin && pin === adminPin) return 'admin';
+  if (staffPin && pin === staffPin) return 'staff';
+  return null;
+}
+
 function checkPin(req, res, next) {
-  if (!ACCESS_PIN) return next();
+  const { adminPin, staffPin } = getAuthSettings();
+  if (!adminPin && !staffPin) {
+    req.role = 'admin';
+    return next();
+  }
   const supplied = req.header('x-access-pin');
-  if (supplied && supplied === ACCESS_PIN) return next();
-  return res.status(401).json({ error: 'Invalid or missing access PIN' });
+  const role = roleForPin(supplied);
+  if (!role) return res.status(401).json({ error: 'Invalid or missing access PIN' });
+  req.role = role;
+  next();
+}
+function requireAdmin(req, res, next) {
+  if (req.role !== 'admin') return res.status(403).json({ error: 'This action requires Admin access' });
+  next();
 }
 app.use('/api', checkPin);
 
@@ -62,11 +96,11 @@ function getFullState() {
   };
 }
 app.get('/api/bootstrap', (req, res) => {
-  res.json(getFullState());
+  res.json({ ...getFullState(), role: req.role });
 });
 
-/* ============ STAFF ============ */
-app.post('/api/staff', (req, res) => {
+/* ============ STAFF (admin only — attendant records & wages are sensitive) ============ */
+app.post('/api/staff', requireAdmin, (req, res) => {
   const { name, role, phone } = req.body || {};
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name is required' });
   const info = db
@@ -75,7 +109,7 @@ app.post('/api/staff', (req, res) => {
   const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(info.lastInsertRowid);
   res.json(staffRowToApi(row));
 });
-app.patch('/api/staff/:id', (req, res) => {
+app.patch('/api/staff/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   const existing = db.prepare('SELECT * FROM staff WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Staff not found' });
@@ -84,14 +118,14 @@ app.patch('/api/staff/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(id);
   res.json(staffRowToApi(row));
 });
-app.delete('/api/staff/:id', (req, res) => {
+app.delete('/api/staff/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   db.prepare('DELETE FROM staff WHERE id = ?').run(id);
   res.json({ ok: true });
 });
 
-/* ============ SERVICES ============ */
-app.post('/api/services', (req, res) => {
+/* ============ SERVICES (admin only — pricing changes) ============ */
+app.post('/api/services', requireAdmin, (req, res) => {
   const { name, price } = req.body || {};
   const p = Number(price);
   if (!name || !String(name).trim() || isNaN(p) || p < 0) {
@@ -101,7 +135,7 @@ app.post('/api/services', (req, res) => {
   const row = db.prepare('SELECT * FROM services WHERE id = ?').get(info.lastInsertRowid);
   res.json(serviceRowToApi(row));
 });
-app.patch('/api/services/:id', (req, res) => {
+app.patch('/api/services/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   const existing = db.prepare('SELECT * FROM services WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Service not found' });
@@ -114,7 +148,7 @@ app.patch('/api/services/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM services WHERE id = ?').get(id);
   res.json(serviceRowToApi(row));
 });
-app.delete('/api/services/:id', (req, res) => {
+app.delete('/api/services/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   db.prepare('DELETE FROM services WHERE id = ?').run(id);
   res.json({ ok: true });
@@ -179,7 +213,7 @@ app.delete('/api/jobs/:id', (req, res) => {
 });
 
 /* ============ BUSINESS & PRINT SETTINGS ============ */
-app.put('/api/business', (req, res) => {
+app.put('/api/business', requireAdmin, (req, res) => {
   const { name, tagline, phone, currency } = req.body || {};
   db.prepare('UPDATE business SET name = ?, tagline = ?, phone = ?, currency = ? WHERE id = 1').run(
     (name || 'SplashBay').trim(),
@@ -190,7 +224,7 @@ app.put('/api/business', (req, res) => {
   const row = db.prepare('SELECT * FROM business WHERE id = 1').get();
   res.json({ name: row.name, tagline: row.tagline, phone: row.phone, currency: row.currency, logo: row.logo || null });
 });
-app.put('/api/business/logo', (req, res) => {
+app.put('/api/business/logo', requireAdmin, (req, res) => {
   const { logo } = req.body || {};
   if (!logo || typeof logo !== 'string' || !logo.startsWith('data:image/')) {
     return res.status(400).json({ error: 'A valid image data URL is required' });
@@ -202,13 +236,13 @@ app.put('/api/business/logo', (req, res) => {
   const row = db.prepare('SELECT * FROM business WHERE id = 1').get();
   res.json({ name: row.name, tagline: row.tagline, phone: row.phone, currency: row.currency, logo: row.logo || null });
 });
-app.delete('/api/business/logo', (req, res) => {
+app.delete('/api/business/logo', requireAdmin, (req, res) => {
   db.prepare('UPDATE business SET logo = NULL WHERE id = 1').run();
   const row = db.prepare('SELECT * FROM business WHERE id = 1').get();
   res.json({ name: row.name, tagline: row.tagline, phone: row.phone, currency: row.currency, logo: null });
 });
 
-app.put('/api/print-settings', (req, res) => {
+app.put('/api/print-settings', requireAdmin, (req, res) => {
   const { paperWidth } = req.body || {};
   db.prepare('UPDATE print_settings SET paper_width = ? WHERE id = 1').run(paperWidth || '80mm');
   const row = db.prepare('SELECT * FROM print_settings WHERE id = 1').get();
@@ -216,11 +250,11 @@ app.put('/api/print-settings', (req, res) => {
 });
 
 /* ============ BACKUP / RESTORE ============ */
-app.get('/api/export', (req, res) => {
+app.get('/api/export', requireAdmin, (req, res) => {
   res.json(getFullState());
 });
 
-app.post('/api/import', (req, res) => {
+app.post('/api/import', requireAdmin, (req, res) => {
   const payload = req.body;
   if (!payload || !Array.isArray(payload.staff) || !Array.isArray(payload.jobs)) {
     return res.status(400).json({ error: 'Invalid backup payload' });
@@ -286,7 +320,7 @@ app.post('/api/import', (req, res) => {
   }
 });
 
-app.post('/api/reset', (req, res) => {
+app.post('/api/reset', requireAdmin, (req, res) => {
   db.exec('DELETE FROM jobs; DELETE FROM staff; DELETE FROM services;');
   db.prepare(`UPDATE business SET name='SplashBay', tagline='Wash Bay Control', phone='', currency='KSh', logo=NULL WHERE id=1`).run();
   db.prepare(`UPDATE print_settings SET paper_width='80mm' WHERE id=1`).run();
@@ -303,7 +337,7 @@ app.post('/api/reset', (req, res) => {
   res.json(getFullState());
 });
 
-app.post('/api/sample-data', (req, res) => {
+app.post('/api/sample-data', requireAdmin, (req, res) => {
   const now = Date.now();
   const insertStaff = db.prepare('INSERT INTO staff (name, role, phone, status) VALUES (?, ?, ?, ?)');
   const s1 = insertStaff.run('Brian Otieno', 'Washer', '0722 111 222', 'active').lastInsertRowid;
@@ -335,6 +369,38 @@ app.post('/api/sample-data', (req, res) => {
   res.json(getFullState());
 });
 
+/* ============ ACCESS & ROLES (admin only) ============ */
+app.get('/api/auth-settings', requireAdmin, (req, res) => {
+  const { adminPin, staffPin } = getAuthSettings();
+  res.json({ adminPinSet: !!adminPin, staffPinSet: !!staffPin });
+});
+app.put('/api/auth-settings', requireAdmin, (req, res) => {
+  const { adminPin, staffPin, clearAdminPin, clearStaffPin } = req.body || {};
+  const current = getAuthSettings();
+
+  let newAdminPin = current.adminPin;
+  if (clearAdminPin) newAdminPin = '';
+  else if (typeof adminPin === 'string' && adminPin.trim()) newAdminPin = adminPin.trim();
+
+  let newStaffPin = current.staffPin;
+  if (clearStaffPin) newStaffPin = '';
+  else if (typeof staffPin === 'string' && staffPin.trim()) newStaffPin = staffPin.trim();
+
+  // Guard against locking the admin out: a staff PIN can't exist without an admin PIN.
+  if (newStaffPin && !newAdminPin) {
+    return res.status(400).json({ error: 'Set an Admin PIN before enabling a Staff PIN, so you can\'t be locked out.' });
+  }
+  if (newAdminPin && newStaffPin && newAdminPin === newStaffPin) {
+    return res.status(400).json({ error: 'Admin PIN and Staff PIN must be different.' });
+  }
+
+  db.prepare('UPDATE auth_settings SET admin_pin = ?, staff_pin = ? WHERE id = 1').run(
+    newAdminPin || null,
+    newStaffPin || null
+  );
+  res.json({ adminPinSet: !!newAdminPin, staffPinSet: !!newStaffPin });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -343,6 +409,7 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`SplashBay server running at http://localhost:${PORT}`);
   console.log(`Database: ${path.join(__dirname, 'data', 'splashbay.db')}`);
-  if (ACCESS_PIN) console.log('Access PIN protection is ENABLED.');
-  else console.log('Access PIN protection is DISABLED (set ACCESS_PIN in .env to enable).');
+  const { adminPin, staffPin } = getAuthSettings();
+  if (adminPin || staffPin) console.log('PIN login is ENABLED (configure via Settings > Access & Roles).');
+  else console.log('PIN login is DISABLED — open access. Set PINs in Settings > Access & Roles to enable.');
 });
