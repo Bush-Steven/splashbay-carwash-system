@@ -79,18 +79,23 @@ function staffRowToApi(row) {
 function serviceRowToApi(row) {
   return { id: row.id, name: row.name, price: row.price };
 }
+function expenseRowToApi(row) {
+  return { id: row.id, date: row.date, category: row.category, description: row.description, amount: row.amount };
+}
 
 /* ============ BOOTSTRAP (full snapshot, used on load + live polling) ============ */
 function getFullState() {
   const staff = db.prepare('SELECT * FROM staff ORDER BY id').all().map(staffRowToApi);
   const services = db.prepare('SELECT * FROM services ORDER BY id').all().map(serviceRowToApi);
   const jobs = db.prepare('SELECT * FROM jobs ORDER BY time_in').all().map(jobRowToApi);
+  const expenses = db.prepare('SELECT * FROM expenses ORDER BY date').all().map(expenseRowToApi);
   const business = db.prepare('SELECT * FROM business WHERE id = 1').get();
   const printSettings = db.prepare('SELECT * FROM print_settings WHERE id = 1').get();
   return {
     staff,
     services,
     jobs,
+    expenses,
     business: { name: business.name, tagline: business.tagline, phone: business.phone, currency: business.currency, logo: business.logo || null },
     printSettings: { paperWidth: printSettings.paper_width },
   };
@@ -212,6 +217,39 @@ app.delete('/api/jobs/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+/* ============ EXPENSES (admin only — financial data) ============ */
+app.post('/api/expenses', requireAdmin, (req, res) => {
+  const { date, category, description, amount } = req.body || {};
+  const amt = Number(amount);
+  if (isNaN(amt) || amt < 0) return res.status(400).json({ error: 'A valid amount is required' });
+  const ts = date ? Number(date) : Date.now();
+  const info = db
+    .prepare('INSERT INTO expenses (date, category, description, amount, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(ts, (category || 'Other').trim(), (description || '').trim(), amt, Date.now());
+  const row = db.prepare('SELECT * FROM expenses WHERE id = ?').get(info.lastInsertRowid);
+  res.json(expenseRowToApi(row));
+});
+app.patch('/api/expenses/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Expense not found' });
+  const { date, category, description, amount } = req.body || {};
+  if (date !== undefined) db.prepare('UPDATE expenses SET date = ? WHERE id = ?').run(Number(date), id);
+  if (category !== undefined) db.prepare('UPDATE expenses SET category = ? WHERE id = ?').run(String(category).trim() || 'Other', id);
+  if (description !== undefined) db.prepare('UPDATE expenses SET description = ? WHERE id = ?').run(String(description).trim(), id);
+  if (amount !== undefined) {
+    const amt = Number(amount);
+    if (!isNaN(amt) && amt >= 0) db.prepare('UPDATE expenses SET amount = ? WHERE id = ?').run(amt, id);
+  }
+  const row = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+  res.json(expenseRowToApi(row));
+});
+app.delete('/api/expenses/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
+  res.json({ ok: true });
+});
+
 /* ============ BUSINESS & PRINT SETTINGS ============ */
 app.put('/api/business', requireAdmin, (req, res) => {
   const { name, tagline, phone, currency } = req.body || {};
@@ -261,7 +299,7 @@ app.post('/api/import', requireAdmin, (req, res) => {
   }
 
   const importTxn = db.transaction(payload => {
-    db.exec('DELETE FROM jobs; DELETE FROM staff; DELETE FROM services;');
+    db.exec('DELETE FROM jobs; DELETE FROM staff; DELETE FROM services; DELETE FROM expenses;');
 
     const staffIdMap = {};
     const insertStaff = db.prepare('INSERT INTO staff (name, role, phone, status) VALUES (?, ?, ?, ?)');
@@ -273,6 +311,11 @@ app.post('/api/import', requireAdmin, (req, res) => {
     const insertService = db.prepare('INSERT INTO services (name, price) VALUES (?, ?)');
     (payload.services || []).forEach(s => {
       insertService.run(s.name || '', Number(s.price) || 0);
+    });
+
+    const insertExpense = db.prepare('INSERT INTO expenses (date, category, description, amount, created_at) VALUES (?, ?, ?, ?, ?)');
+    (payload.expenses || []).forEach(x => {
+      insertExpense.run(x.date || Date.now(), x.category || 'Other', x.description || '', Number(x.amount) || 0, Date.now());
     });
 
     const insertJob = db.prepare(
@@ -321,7 +364,7 @@ app.post('/api/import', requireAdmin, (req, res) => {
 });
 
 app.post('/api/reset', requireAdmin, (req, res) => {
-  db.exec('DELETE FROM jobs; DELETE FROM staff; DELETE FROM services;');
+  db.exec('DELETE FROM jobs; DELETE FROM staff; DELETE FROM services; DELETE FROM expenses;');
   db.prepare(`UPDATE business SET name='SplashBay', tagline='Wash Bay Control', phone='', currency='KSh', logo=NULL WHERE id=1`).run();
   db.prepare(`UPDATE print_settings SET paper_width='80mm' WHERE id=1`).run();
   const DEFAULT_SERVICES = [

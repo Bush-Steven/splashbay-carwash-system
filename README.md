@@ -8,7 +8,8 @@ A complete carwash management system with a real **Node/Express backend** backed
 - **Active Bay** — see all vehicles in progress, cancel a mistaken check-in, or check out with a payment method to generate a receipt
 - **Staff** — add/remove attendants, track Today / This Week / This Month / All-Time revenue and sales per person, with a detailed drill-down view and chart
 - **Invoices & Receipts** — full searchable history, reprintable any time, with delete for correcting mistakes
-- **Revenue Reports** — all-time revenue, average ticket size, unpaid balance, 30-day trend, top staff by revenue
+- **Revenue Reports** — all-time revenue, total expenses, net profit, average ticket size, unpaid balance, 30-day trend, top staff by revenue
+- **Expenses** — log business costs by category (supplies, utilities, wages, rent, etc.), with Today/Week/Month/All-Time totals, a category breakdown chart, and full history (admin only)
 - **Settings** — business name/phone/currency (shown on every invoice & receipt), editable service catalog & prices, JSON backup export/import, CSV export for accounting, sample data loader, full reset
 - **Receipt Printer** — configurable paper width (58mm / 80mm thermal, or A4), works with any printer already installed on the computer
 - **Shared live data** — every open tab/device polls the server every few seconds, so a check-in on one terminal shows up on another automatically
@@ -23,6 +24,7 @@ Schema (see `db.js`):
 - `staff` — id, name, role, phone, status
 - `services` — id, name, price (your service catalog)
 - `jobs` — id, invoice/receipt numbers, customer/vehicle details, a **snapshot** of the service name & price at the time of registration (so editing a price later never rewrites history), foreign keys to `staff` and `services` (`ON DELETE SET NULL`, so deleting a staff member or service keeps historical job records intact)
+- `expenses` — id, date, category, description, amount
 
 ## Architecture
 ```
@@ -51,6 +53,7 @@ splashbay-app/
 | `POST /api/jobs` | register (check in) a vehicle |
 | `POST /api/jobs/:id/checkout` | complete + pay for a job |
 | `DELETE /api/jobs/:id` | cancel/delete a job record |
+| `POST /api/expenses` / `PATCH /api/expenses/:id` / `DELETE /api/expenses/:id` | (admin only) log, edit, or remove a business expense |
 | `PUT /api/business` | update business details |
 | `PUT /api/print-settings` | update receipt paper width |
 | `GET /api/auth-settings` / `PUT /api/auth-settings` | (admin only) view/set the Staff & Admin PINs |

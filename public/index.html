@@ -307,6 +307,7 @@ select{cursor:pointer;}
       <li><button data-view="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="8.5" r="2.4"/><path d="M15.8 14.3c2.9.4 4.7 2.5 4.7 5.7"/></svg><span>Staff</span></button></li>
       <li><button data-view="records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M9 11h6M9 15h6M9 7h3"/></svg><span>Invoices &amp; Receipts</span></button></li>
       <li><button data-view="revenue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V9M9 21V3M15 21v-7M21 21v-11"/></svg><span>Revenue Reports</span></button></li>
+      <li><button data-view="expenses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M9 9.5c0-1 .9-1.5 3-1.5s3 .8 3 1.5-1 1.2-3 1.5-3 .8-3 1.5.9 1.5 3 1.5 3-.5 3-1.5"/></svg><span>Expenses</span></button></li>
       <li><button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15 1.65 1.65 0 003.17 14H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.14.36.4.66.73.85.34.2.7.29 1.09.3h.15a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Settings</span></button></li>
     </ul>
     <div class="sidebar-foot">
@@ -504,11 +505,21 @@ select{cursor:pointer;}
           <p>How the business is performing</p>
         </div>
       </div>
-      <div class="grid-stats" style="grid-template-columns:repeat(3,1fr);">
+      <div class="grid-stats">
         <div class="stat-card" style="--accent-glow: rgba(45,212,191,.15);">
           <div class="stat-label">All-Time Revenue</div>
           <div class="stat-value" id="revAllTime">KSh 0</div>
           <div class="stat-foot">from all completed &amp; paid jobs</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(240,82,82,.15);">
+          <div class="stat-label">Total Expenses</div>
+          <div class="stat-value" id="revExpenses">KSh 0</div>
+          <div class="stat-foot" id="revExpensesFoot">all recorded costs</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(45,212,191,.15);">
+          <div class="stat-label">Net Profit</div>
+          <div class="stat-value" id="revNetProfit">KSh 0</div>
+          <div class="stat-foot" id="revNetProfitFoot">revenue minus expenses</div>
         </div>
         <div class="stat-card" style="--accent-glow: rgba(245,165,36,.15);">
           <div class="stat-label">Avg. Ticket Value</div>
@@ -534,6 +545,57 @@ select{cursor:pointer;}
       </div>
     </section>
 
+    <!-- EXPENSES -->
+    <section id="view-expenses" class="view" style="display:none;">
+      <div class="topbar">
+        <div>
+          <h1>Expenses</h1>
+          <p>Track your business costs <span class="live-badge"><span class="live-dot"></span><span class="live-label">Live</span></span></p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="openExpenseModal()">+ Add Expense</button>
+        </div>
+      </div>
+
+      <div class="grid-stats">
+        <div class="stat-card" style="--accent-glow: rgba(240,82,82,.15);">
+          <div class="stat-label">Today</div>
+          <div class="stat-value" id="expToday">KSh 0</div>
+          <div class="stat-foot" id="expTodayCount">0 expenses</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(245,165,36,.15);">
+          <div class="stat-label">This Week</div>
+          <div class="stat-value" id="expWeek">KSh 0</div>
+          <div class="stat-foot" id="expWeekCount">0 expenses</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(240,82,82,.15);">
+          <div class="stat-label">This Month</div>
+          <div class="stat-value" id="expMonth">KSh 0</div>
+          <div class="stat-foot" id="expMonthCount">0 expenses</div>
+        </div>
+        <div class="stat-card" style="--accent-glow: rgba(143,163,184,.15);">
+          <div class="stat-label">All-Time</div>
+          <div class="stat-value" id="expAll">KSh 0</div>
+          <div class="stat-foot" id="expAllCount">0 expenses</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><h2>Expense History</h2><span class="sub" id="expenseCountSub">0 recorded</span></div>
+          <table>
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead>
+            <tbody id="expensesTableBody"></tbody>
+          </table>
+          <div class="empty-note" id="expensesEmpty" style="display:none;">No expenses recorded yet.</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>By Category</h2><span class="sub">all time</span></div>
+          <canvas id="expenseChart" height="180"></canvas>
+        </div>
+      </div>
+    </section>
+
     <!-- SETTINGS -->
     <section id="view-settings" class="view" style="display:none;">
       <div class="topbar">
@@ -542,6 +604,7 @@ select{cursor:pointer;}
           <p>Configure your business, services and data</p>
         </div>
       </div>
+
 
       <div class="panel" style="max-width:720px;">
         <div class="panel-head"><h2>Business Details</h2><span class="sub">shown on invoices &amp; receipts</span></div>
@@ -749,6 +812,33 @@ select{cursor:pointer;}
   </div>
 </div>
 
+<!-- ADD EXPENSE MODAL -->
+<div class="modal-backdrop" id="expenseModalBackdrop">
+  <div class="modal-box" style="position:relative;">
+    <button class="close-x" onclick="closeExpenseModal()">&times;</button>
+    <h3>Add Expense</h3>
+    <div class="field" style="margin-bottom:12px;"><label>Date</label><input id="eDate" type="date"></div>
+    <div class="field" style="margin-bottom:12px;"><label>Category</label>
+      <select id="eCategory">
+        <option>Supplies &amp; Chemicals</option>
+        <option>Utilities (Water/Electricity)</option>
+        <option>Staff Wages</option>
+        <option>Equipment &amp; Maintenance</option>
+        <option>Rent</option>
+        <option>Marketing</option>
+        <option>Transport</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:12px;"><label>Description</label><input id="eDescription" placeholder="e.g. Refill of car shampoo &amp; microfiber towels"></div>
+    <div class="field" style="margin-bottom:18px;"><label>Amount</label><input id="eAmount" type="number" min="0" placeholder="e.g. 2500"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="addExpense()">Add Expense</button>
+      <button class="btn btn-ghost" onclick="closeExpenseModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- STAFF DETAIL / SALES MODAL -->
 <div class="modal-backdrop" id="staffDetailBackdrop">
   <div class="modal-box" style="position:relative;width:600px;max-width:100%;">
@@ -838,6 +928,7 @@ function freshState(){
     staff: [],
     jobs: [],
     services: DEFAULT_SERVICES.map(s=>({...s})),
+    expenses: [],
     business: {...DEFAULT_BUSINESS},
     printSettings: {...DEFAULT_PRINT_SETTINGS},
   };
@@ -954,7 +1045,7 @@ async function submitPin(){
   await bootApp();
 }
 /* ---- Apply role-based nav visibility (admin sees everything; staff is operational-only) ---- */
-const ADMIN_ONLY_VIEWS = ["staff","revenue","settings"];
+const ADMIN_ONLY_VIEWS = ["staff","revenue","expenses","settings"];
 function applyRoleVisibility(){
   const isAdmin = currentRole !== "staff";
   document.querySelectorAll(".nav button[data-view]").forEach(btn=>{
@@ -977,6 +1068,7 @@ function refreshActiveView(){
   if(v==="staff") renderStaff();
   if(v==="records") renderRecords();
   if(v==="revenue") renderRevenue();
+  if(v==="expenses") renderExpenses();
   updateBayTag();
   if(currentStaffDetailId!=null && document.getElementById("staffDetailBackdrop").classList.contains("show")){
     renderStaffDetail(currentStaffDetailId);
@@ -1050,6 +1142,7 @@ function switchView(name){
   if(name==="staff") renderStaff();
   if(name==="records") renderRecords();
   if(name==="revenue") renderRevenue();
+  if(name==="expenses") renderExpenses();
   if(name==="register") populateRegisterForm();
   if(name==="settings") renderSettings();
 }
@@ -1560,10 +1653,18 @@ function renderRevenue(){
   const allTime = paidJobs.reduce((s,j)=>s+j.service.price,0);
   const avg = paidJobs.length ? allTime/paidJobs.length : 0;
   const unpaid = state.jobs.filter(j=>!j.paid && j.status==="completed").reduce((s,j)=>s+j.service.price,0);
+  const totalExpenses = state.expenses.reduce((s,x)=>s+x.amount,0);
+  const netProfit = allTime - totalExpenses;
 
   document.getElementById("revAllTime").textContent = money(allTime);
   document.getElementById("revAvg").textContent = money(avg);
   document.getElementById("revUnpaid").textContent = money(unpaid);
+  document.getElementById("revExpenses").textContent = money(totalExpenses);
+  document.getElementById("revExpensesFoot").textContent = state.expenses.length + " expense" + (state.expenses.length===1?"":"s") + " recorded";
+  document.getElementById("revNetProfit").textContent = money(netProfit);
+  const netFoot = document.getElementById("revNetProfitFoot");
+  netFoot.textContent = "revenue minus expenses";
+  netFoot.className = "stat-foot " + (netProfit >= 0 ? "up" : "warn");
 
   // 30 day chart
   const days = [];
@@ -1587,6 +1688,107 @@ function renderRevenue(){
   document.getElementById("topStaffBody").innerHTML = perf.map(p=>`
     <tr><td>${p.name}</td><td>${p.jobs}</td><td class="mono">${money(p.rev)}</td></tr>
   `).join("") || `<tr><td colspan="3" class="empty-note">No data yet.</td></tr>`;
+}
+
+/* ============ EXPENSES ============ */
+let expenseChart;
+function openExpenseModal(){
+  document.getElementById("eDate").value = new Date().toISOString().slice(0,10);
+  document.getElementById("eDescription").value = "";
+  document.getElementById("eAmount").value = "";
+  document.getElementById("expenseModalBackdrop").classList.add("show");
+}
+function closeExpenseModal(){
+  document.getElementById("expenseModalBackdrop").classList.remove("show");
+}
+async function addExpense(){
+  const dateStr = document.getElementById("eDate").value;
+  const category = document.getElementById("eCategory").value;
+  const description = document.getElementById("eDescription").value.trim();
+  const amount = Number(document.getElementById("eAmount").value);
+  if(isNaN(amount) || amount <= 0){
+    alert("Please enter a valid amount.");
+    return;
+  }
+  const date = dateStr ? new Date(dateStr + "T12:00:00").getTime() : Date.now();
+  try{
+    const expense = await api("POST", "/api/expenses", { date, category, description, amount });
+    state.expenses.push(expense);
+    lastSyncTime = Date.now();
+    closeExpenseModal();
+    refreshActiveView();
+  }catch(e){
+    alert("Couldn't add expense: " + e.message);
+  }
+}
+async function deleteExpense(id){
+  if(!confirm("Delete this expense record?")) return;
+  try{
+    await api("DELETE", "/api/expenses/" + id);
+    state.expenses = state.expenses.filter(x=>x.id!==id);
+    lastSyncTime = Date.now();
+    refreshActiveView();
+  }catch(e){
+    alert("Couldn't delete expense: " + e.message);
+  }
+}
+function expensePeriodTotals(){
+  const today = state.expenses.filter(x=>isToday(x.date));
+  const week = state.expenses.filter(x=>isThisWeek(x.date));
+  const month = state.expenses.filter(x=>isThisMonth(x.date));
+  const sum = arr=>arr.reduce((s,x)=>s+x.amount,0);
+  return {
+    today:{amt:sum(today), count:today.length},
+    week:{amt:sum(week), count:week.length},
+    month:{amt:sum(month), count:month.length},
+    all:{amt:sum(state.expenses), count:state.expenses.length},
+  };
+}
+function renderExpenses(){
+  const t = expensePeriodTotals();
+  document.getElementById("expToday").textContent = money(t.today.amt);
+  document.getElementById("expTodayCount").textContent = t.today.count + " expense" + (t.today.count===1?"":"s");
+  document.getElementById("expWeek").textContent = money(t.week.amt);
+  document.getElementById("expWeekCount").textContent = t.week.count + " expense" + (t.week.count===1?"":"s");
+  document.getElementById("expMonth").textContent = money(t.month.amt);
+  document.getElementById("expMonthCount").textContent = t.month.count + " expense" + (t.month.count===1?"":"s");
+  document.getElementById("expAll").textContent = money(t.all.amt);
+  document.getElementById("expAllCount").textContent = t.all.count + " expense" + (t.all.count===1?"":"s");
+
+  const sorted = [...state.expenses].sort((a,b)=>b.date-a.date);
+  const body = document.getElementById("expensesTableBody");
+  const empty = document.getElementById("expensesEmpty");
+  document.getElementById("expenseCountSub").textContent = sorted.length + " recorded";
+  if(sorted.length===0){ body.innerHTML=""; empty.style.display="block"; }
+  else{
+    empty.style.display="none";
+    body.innerHTML = sorted.map(x=>`
+      <tr>
+        <td class="mono">${fmtDate(x.date)}</td>
+        <td>${x.category}</td>
+        <td>${x.description || "—"}</td>
+        <td class="mono">${money(x.amount)}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteExpense(${x.id})">Delete</button></td>
+      </tr>
+    `).join("");
+  }
+
+  // category breakdown chart
+  const byCategory = {};
+  state.expenses.forEach(x=>{ byCategory[x.category] = (byCategory[x.category]||0) + x.amount; });
+  const labels = Object.keys(byCategory);
+  const data = Object.values(byCategory);
+  const ctx = document.getElementById("expenseChart");
+  if(expenseChart) expenseChart.destroy();
+  if(labels.length===0){
+    const c = ctx.getContext('2d'); c.clearRect(0,0,ctx.width,ctx.height);
+    return;
+  }
+  expenseChart = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:['#F05252','#F5A524','#8FA3B8','#5B8DEF','#2DD4BF','#A78BFA','#F472B6','#94A3B8'], borderColor:'#152841', borderWidth:3 }]},
+    options:{ plugins:{ legend:{ position:'bottom', labels:{ color:'#EAF2F8', boxWidth:12, font:{size:11} } } } }
+  });
 }
 
 /* ============ SETTINGS ============ */

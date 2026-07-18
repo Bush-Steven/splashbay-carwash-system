@@ -69,6 +69,16 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_staff ON jobs(staff_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_time_out ON jobs(time_out);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date INTEGER NOT NULL,
+  category TEXT NOT NULL DEFAULT 'Other',
+  description TEXT DEFAULT '',
+  amount REAL NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 `);
 
 /* ---- migrations for databases created before a column existed ---- */
