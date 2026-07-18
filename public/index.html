@@ -286,7 +286,8 @@ select{cursor:pointer;}
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-mark">
-        <svg class="drop" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/><path d="M8.5 16.5a3.5 3.5 0 003.5 3.5" stroke="#0F1C2E" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <svg class="drop" id="brandDropIcon" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/><path d="M8.5 16.5a3.5 3.5 0 003.5 3.5" stroke="#0F1C2E" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <img id="brandLogoImg" style="display:none;width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0;">
         <div>
           <div class="brand-name" id="brandName">SplashBay</div>
           <div class="brand-sub" id="brandSub">Wash Bay Control</div>
@@ -562,6 +563,27 @@ select{cursor:pointer;}
       </div>
 
       <div class="panel" style="max-width:720px;">
+        <div class="panel-head"><h2>Business Logo</h2><span class="sub">shown in the sidebar &amp; on tickets</span></div>
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+          <div id="logoPreviewWrap" style="width:96px;height:96px;border-radius:12px;border:1px dashed var(--line);background:var(--surface-2);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+            <img id="logoPreviewImg" style="display:none;width:100%;height:100%;object-fit:cover;">
+            <span id="logoPreviewEmpty" style="font-size:11px;color:var(--text-dim);text-align:center;padding:8px;">No logo yet</span>
+          </div>
+          <div style="flex:1;min-width:200px;">
+            <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;line-height:1.6;">
+              Upload a square-ish logo (PNG or JPG). It's resized automatically and shown next to your business name
+              in the sidebar, and at the top of every printed invoice and receipt.
+            </p>
+            <div class="modal-actions" style="justify-content:flex-start;">
+              <button class="btn btn-primary" onclick="document.getElementById('logoFile').click()">Upload Logo</button>
+              <input type="file" id="logoFile" accept="image/*" style="display:none;" onchange="uploadLogo(event)">
+              <button class="btn btn-danger" id="removeLogoBtn" style="display:none;" onclick="removeLogo()">Remove Logo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="max-width:720px;">
         <div class="panel-head"><h2>Services &amp; Pricing</h2><span class="sub">what you charge for</span></div>
         <table>
           <thead><tr><th>Service Name</th><th>Price</th><th></th></tr></thead>
@@ -644,6 +666,7 @@ select{cursor:pointer;}
 <div class="modal-backdrop" id="invoiceBackdrop">
   <div class="ticket" id="invoiceTicket">
     <div class="stamp">INVOICE</div>
+    <img id="invBizLogo" style="display:none;width:56px;height:56px;object-fit:cover;border-radius:8px;margin:0 auto 8px;">
     <h3 id="invBizName">SplashBay</h3>
     <div class="biz" id="invBizTagline">Wash Bay Control · Nairobi</div>
     <div class="ticket-notch"></div>
@@ -661,6 +684,7 @@ select{cursor:pointer;}
 <div class="modal-backdrop" id="receiptBackdrop">
   <div class="ticket" id="receiptTicket">
     <div class="stamp" style="border-color:var(--aqua-dim);color:var(--aqua-dim);">PAID</div>
+    <img id="rcBizLogo" style="display:none;width:56px;height:56px;object-fit:cover;border-radius:8px;margin:0 auto 8px;">
     <h3 id="rcBizName">SplashBay</h3>
     <div class="biz" id="rcBizTagline">Payment Receipt</div>
     <div class="ticket-notch"></div>
@@ -1075,6 +1099,9 @@ function openInvoice(jobId){
   currentTicketId = "invoiceTicket";
   document.getElementById("invBizName").textContent = state.business.name;
   document.getElementById("invBizTagline").textContent = state.business.tagline + (state.business.phone ? " · " + state.business.phone : "");
+  const invLogo = document.getElementById("invBizLogo");
+  invLogo.style.display = state.business.logo ? "block" : "none";
+  if(state.business.logo) invLogo.src = state.business.logo;
   document.getElementById("invoiceBody").innerHTML = `
     <div class="ticket-row"><span class="k">Invoice #</span><span class="v">${j.invoiceNo}</span></div>
     <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeIn)} ${fmtTime(j.timeIn)}</span></div>
@@ -1099,6 +1126,9 @@ function openReceipt(jobId){
   currentTicketId = "receiptTicket";
   document.getElementById("rcBizName").textContent = state.business.name;
   document.getElementById("rcBizTagline").textContent = "Payment Receipt";
+  const rcLogo = document.getElementById("rcBizLogo");
+  rcLogo.style.display = state.business.logo ? "block" : "none";
+  if(state.business.logo) rcLogo.src = state.business.logo;
   document.getElementById("receiptBody").innerHTML = `
     <div class="ticket-row"><span class="k">Receipt #</span><span class="v">${j.receiptNo}</span></div>
     <div class="ticket-row"><span class="k">Invoice Ref</span><span class="v">${j.invoiceNo}</span></div>
@@ -1460,6 +1490,10 @@ function applyBusinessBranding(){
   document.getElementById("brandName").textContent = state.business.name || "Carwash";
   document.getElementById("brandSub").textContent = state.business.tagline || "";
   document.title = (state.business.name || "Carwash") + " — Operations";
+  const logo = state.business.logo;
+  document.getElementById("brandLogoImg").style.display = logo ? "block" : "none";
+  document.getElementById("brandDropIcon").style.display = logo ? "none" : "block";
+  if(logo) document.getElementById("brandLogoImg").src = logo;
 }
 function renderSettings(){
   document.getElementById("setBizName").value = state.business.name || "";
@@ -1468,7 +1502,61 @@ function renderSettings(){
   document.getElementById("setBizCurrency").value = state.business.currency || "KSh";
   document.getElementById("setPaperWidth").value = (state.printSettings && state.printSettings.paperWidth) || "80mm";
   document.getElementById("storageModeSub").textContent = "saved on the server · shared across all devices";
+  const logo = state.business.logo;
+  document.getElementById("logoPreviewImg").style.display = logo ? "block" : "none";
+  document.getElementById("logoPreviewEmpty").style.display = logo ? "none" : "block";
+  document.getElementById("removeLogoBtn").style.display = logo ? "inline-flex" : "none";
+  if(logo) document.getElementById("logoPreviewImg").src = logo;
   renderServicesTable();
+}
+function resizeImageFile(file, maxSize){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > h && w > maxSize){ h = Math.round(h * (maxSize/w)); w = maxSize; }
+        else if(h > maxSize){ w = Math.round(w * (maxSize/h)); h = maxSize; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/png", 0.9));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function uploadLogo(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith("image/")){ alert("Please choose an image file."); return; }
+  try{
+    const dataUrl = await resizeImageFile(file, 400);
+    const business = await api("PUT", "/api/business/logo", { logo: dataUrl });
+    state.business = business;
+    lastSyncTime = Date.now();
+    applyBusinessBranding();
+    renderSettings();
+  }catch(e){
+    alert("Couldn't upload logo: " + e.message);
+  }
+  event.target.value = "";
+}
+async function removeLogo(){
+  if(!confirm("Remove the business logo?")) return;
+  try{
+    const business = await api("DELETE", "/api/business/logo");
+    state.business = business;
+    lastSyncTime = Date.now();
+    applyBusinessBranding();
+    renderSettings();
+  }catch(e){
+    alert("Couldn't remove logo: " + e.message);
+  }
 }
 async function saveBusinessSettings(){
   try{

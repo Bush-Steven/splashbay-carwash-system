@@ -57,7 +57,7 @@ function getFullState() {
     staff,
     services,
     jobs,
-    business: { name: business.name, tagline: business.tagline, phone: business.phone, currency: business.currency },
+    business: { name: business.name, tagline: business.tagline, phone: business.phone, currency: business.currency, logo: business.logo || null },
     printSettings: { paperWidth: printSettings.paper_width },
   };
 }
@@ -188,8 +188,26 @@ app.put('/api/business', (req, res) => {
     (currency || 'KSh').trim()
   );
   const row = db.prepare('SELECT * FROM business WHERE id = 1').get();
-  res.json({ name: row.name, tagline: row.tagline, phone: row.phone, currency: row.currency });
+  res.json({ name: row.name, tagline: row.tagline, phone: row.phone, currency: row.currency, logo: row.logo || null });
 });
+app.put('/api/business/logo', (req, res) => {
+  const { logo } = req.body || {};
+  if (!logo || typeof logo !== 'string' || !logo.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'A valid image data URL is required' });
+  }
+  if (logo.length > 3_000_000) {
+    return res.status(400).json({ error: 'Logo image is too large' });
+  }
+  db.prepare('UPDATE business SET logo = ? WHERE id = 1').run(logo);
+  const row = db.prepare('SELECT * FROM business WHERE id = 1').get();
+  res.json({ name: row.name, tagline: row.tagline, phone: row.phone, currency: row.currency, logo: row.logo || null });
+});
+app.delete('/api/business/logo', (req, res) => {
+  db.prepare('UPDATE business SET logo = NULL WHERE id = 1').run();
+  const row = db.prepare('SELECT * FROM business WHERE id = 1').get();
+  res.json({ name: row.name, tagline: row.tagline, phone: row.phone, currency: row.currency, logo: null });
+});
+
 app.put('/api/print-settings', (req, res) => {
   const { paperWidth } = req.body || {};
   db.prepare('UPDATE print_settings SET paper_width = ? WHERE id = 1').run(paperWidth || '80mm');
@@ -248,11 +266,12 @@ app.post('/api/import', (req, res) => {
     });
 
     const biz = payload.business || {};
-    db.prepare('UPDATE business SET name = ?, tagline = ?, phone = ?, currency = ? WHERE id = 1').run(
+    db.prepare('UPDATE business SET name = ?, tagline = ?, phone = ?, currency = ?, logo = ? WHERE id = 1').run(
       biz.name || 'SplashBay',
       biz.tagline || '',
       biz.phone || '',
-      biz.currency || 'KSh'
+      biz.currency || 'KSh',
+      biz.logo || null
     );
     const ps = payload.printSettings || {};
     db.prepare('UPDATE print_settings SET paper_width = ? WHERE id = 1').run(ps.paperWidth || '80mm');
@@ -269,7 +288,7 @@ app.post('/api/import', (req, res) => {
 
 app.post('/api/reset', (req, res) => {
   db.exec('DELETE FROM jobs; DELETE FROM staff; DELETE FROM services;');
-  db.prepare(`UPDATE business SET name='SplashBay', tagline='Wash Bay Control', phone='', currency='KSh' WHERE id=1`).run();
+  db.prepare(`UPDATE business SET name='SplashBay', tagline='Wash Bay Control', phone='', currency='KSh', logo=NULL WHERE id=1`).run();
   db.prepare(`UPDATE print_settings SET paper_width='80mm' WHERE id=1`).run();
   const DEFAULT_SERVICES = [
     { name: 'Express Exterior Wash', price: 400 },

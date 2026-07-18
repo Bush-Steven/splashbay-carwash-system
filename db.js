@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS business (
   name TEXT NOT NULL DEFAULT 'SplashBay',
   tagline TEXT DEFAULT 'Wash Bay Control',
   phone TEXT DEFAULT '',
-  currency TEXT NOT NULL DEFAULT 'KSh'
+  currency TEXT NOT NULL DEFAULT 'KSh',
+  logo TEXT
 );
 
 CREATE TABLE IF NOT EXISTS print_settings (
@@ -63,6 +64,12 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_staff ON jobs(staff_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_time_out ON jobs(time_out);
 `);
+
+/* ---- migrations for databases created before a column existed ---- */
+const businessColumns = db.prepare(`PRAGMA table_info(business)`).all().map(c => c.name);
+if (!businessColumns.includes('logo')) {
+  db.exec(`ALTER TABLE business ADD COLUMN logo TEXT`);
+}
 
 /* ---- seed sensible defaults on a brand-new database ---- */
 const DEFAULT_SERVICES = [
