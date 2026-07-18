@@ -1593,7 +1593,7 @@ function renderRecords(){
       <td style="display:flex;gap:6px;">
         <button class="btn btn-sm" onclick="openInvoice(${j.id})">Invoice</button>
         ${j.paid ? `<button class="btn btn-sm" onclick="openReceipt(${j.id})">Receipt</button>` : ""}
-        <button class="btn btn-sm btn-danger" onclick="deleteRecord(${j.id})">Delete</button>
+        ${(currentRole !== "staff" || j.status !== "completed") ? `<button class="btn btn-sm btn-danger" onclick="deleteRecord(${j.id})">Delete</button>` : ""}
       </td>
     </tr>
   `).join("");

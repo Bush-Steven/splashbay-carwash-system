@@ -2,6 +2,11 @@ const express = require('express');
 const path = require('path');
 const db = require('./db');
 
+// Safety net: log unexpected errors instead of letting one bad request take the
+// whole server down for every device connected to it.
+process.on('uncaughtException', err => console.error('Uncaught exception:', err));
+process.on('unhandledRejection', err => console.error('Unhandled rejection:', err));
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 // Legacy env-var fallback: if no Admin PIN has been set in the app yet (Settings > Access & Roles),
@@ -179,6 +184,9 @@ app.post('/api/jobs', (req, res) => {
   if (!customer || !plate || !serviceIds || !serviceIds.length || !staffId) {
     return res.status(400).json({ error: 'customer, plate, at least one service, and staffId are required' });
   }
+  const staffRow = db.prepare('SELECT id FROM staff WHERE id = ?').get(Number(staffId));
+  if (!staffRow) return res.status(400).json({ error: 'Unknown staff member — they may have been removed. Please pick another.' });
+
   const placeholders = serviceIds.map(() => '?').join(',');
   const services = db.prepare(`SELECT * FROM services WHERE id IN (${placeholders})`).all(...serviceIds.map(Number));
   if (!services.length) return res.status(400).json({ error: 'Unknown service(s)' });
@@ -188,33 +196,38 @@ app.post('/api/jobs', (req, res) => {
   const combinedName = itemized.map(s => s.name).join(' + ');
   const timeIn = Date.now();
 
-  const insertJob = db.transaction(() => {
-    const info = db
-      .prepare(
-        `INSERT INTO jobs (customer, phone, plate, model, service_id, service_name, service_price, services_json, staff_id, time_in, status, paid)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'in-bay', 0)`
-      )
-      .run(
-        String(customer).trim(),
-        phone || '',
-        String(plate).trim().toUpperCase(),
-        model || '',
-        itemized[0].id,
-        combinedName,
-        totalPrice,
-        JSON.stringify(itemized),
-        Number(staffId),
-        timeIn
-      );
-    const id = info.lastInsertRowid;
-    const invoiceNo = 'ORD-' + (1000 + id);
-    db.prepare('UPDATE jobs SET invoice_no = ? WHERE id = ?').run(invoiceNo, id);
-    return id;
-  });
+  try {
+    const insertJob = db.transaction(() => {
+      const info = db
+        .prepare(
+          `INSERT INTO jobs (customer, phone, plate, model, service_id, service_name, service_price, services_json, staff_id, time_in, status, paid)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'in-bay', 0)`
+        )
+        .run(
+          String(customer).trim(),
+          phone || '',
+          String(plate).trim().toUpperCase(),
+          model || '',
+          itemized[0].id,
+          combinedName,
+          totalPrice,
+          JSON.stringify(itemized),
+          Number(staffId),
+          timeIn
+        );
+      const id = info.lastInsertRowid;
+      const invoiceNo = 'ORD-' + (1000 + id);
+      db.prepare('UPDATE jobs SET invoice_no = ? WHERE id = ?').run(invoiceNo, id);
+      return id;
+    });
 
-  const id = insertJob();
-  const row = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
-  res.json(jobRowToApi(row));
+    const id = insertJob();
+    const row = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
+    res.json(jobRowToApi(row));
+  } catch (e) {
+    console.error('Failed to register job:', e);
+    res.status(500).json({ error: 'Could not register the vehicle. Please try again.' });
+  }
 });
 
 app.post('/api/jobs/:id/checkout', (req, res) => {
@@ -233,6 +246,13 @@ app.post('/api/jobs/:id/checkout', (req, res) => {
 
 app.delete('/api/jobs/:id', (req, res) => {
   const id = Number(req.params.id);
+  const existing = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Job not found' });
+  // Staff can cancel a mistaken in-bay check-in, but once a job is completed
+  // (meaning an invoice/receipt has been issued), only Admin can delete that record.
+  if (existing.status === 'completed' && req.role !== 'admin') {
+    return res.status(403).json({ error: 'Only Admin can delete a completed invoice/receipt record.' });
+  }
   db.prepare('DELETE FROM jobs WHERE id = ?').run(id);
   res.json({ ok: true });
 });
