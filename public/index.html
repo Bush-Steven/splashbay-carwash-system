@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SplashBay — Carwash Operations</title>
+<title>OshaRide — Carwash Operations</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script>
@@ -215,6 +215,14 @@ select{cursor:pointer;}
 .price-preview{
   font-family:var(--mono);font-size:26px;color:var(--aqua);font-weight:700;
 }
+.svc-check-row{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;
+  transition:background .12s;
+}
+.svc-check-row:hover{background:var(--surface);}
+.svc-check-row input[type="checkbox"]{width:16px;height:16px;flex-shrink:0;accent-color:var(--aqua);cursor:pointer;}
+.svc-check-row .svc-name{flex:1;font-size:14px;}
+.svc-check-row .svc-price{font-family:var(--mono);font-size:13px;color:var(--text-dim);}
 
 /* ---------- Modal / Ticket ---------- */
 .modal-backdrop{
@@ -295,7 +303,7 @@ select{cursor:pointer;}
         <svg class="drop" id="brandDropIcon" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/><path d="M8.5 16.5a3.5 3.5 0 003.5 3.5" stroke="#0F1C2E" stroke-width="1.4" stroke-linecap="round"/></svg>
         <img id="brandLogoImg" style="display:none;width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0;">
         <div>
-          <div class="brand-name" id="brandName">SplashBay</div>
+          <div class="brand-name" id="brandName">OshaRide</div>
           <div class="brand-sub" id="brandSub">Wash Bay Control</div>
         </div>
       </div>
@@ -311,6 +319,12 @@ select{cursor:pointer;}
       <li><button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15 1.65 1.65 0 003.17 14H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.14.36.4.66.73.85.34.2.7.29 1.09.3h.15a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Settings</span></button></li>
     </ul>
     <div class="sidebar-foot">
+      <div id="sessionBox" style="display:none;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span class="badge" id="roleBadge" style="font-family:var(--body);">Admin</span>
+          <button class="btn btn-sm btn-ghost" onclick="logout()" style="padding:5px 10px;">Logout</button>
+        </div>
+      </div>
       <div class="clock" id="clock">--:--:--</div>
     </div>
   </aside>
@@ -422,15 +436,15 @@ select{cursor:pointer;}
             <input id="fModel" placeholder="e.g. Toyota Axio, Silver">
           </div>
           <div class="field">
-            <label>Service</label>
-            <select id="fService"></select>
-          </div>
-          <div class="field">
             <label>Assign Staff</label>
             <select id="fStaff"></select>
           </div>
           <div class="field full">
-            <label>Amount Due</label>
+            <label>Services (select all that the customer wants)</label>
+            <div id="fServicesList" style="display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:8px;padding:8px 4px;background:var(--surface-2);max-height:260px;overflow-y:auto;"></div>
+          </div>
+          <div class="field full">
+            <label>Total Amount Due</label>
             <div class="price-preview" id="fPricePreview">KSh 0</div>
           </div>
         </div>
@@ -611,7 +625,7 @@ select{cursor:pointer;}
         <div class="form-grid">
           <div class="field full">
             <label>Business Name</label>
-            <input id="setBizName" placeholder="e.g. SplashBay Carwash">
+            <input id="setBizName" placeholder="e.g. OshaRide Carwash">
           </div>
           <div class="field full">
             <label>Tagline / Address</label>
@@ -693,8 +707,8 @@ select{cursor:pointer;}
         <div class="panel-head"><h2>Access &amp; Roles</h2><span class="sub" id="authStatusSub">—</span></div>
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6;">
           Set up two login PINs so front-line staff and the business owner see different things.
-          <b>Staff PIN</b> unlocks Dashboard, New Registration, Active Bay and Invoices &amp; Receipts only.
-          <b>Admin PIN</b> unlocks everything, including Staff management, Revenue Reports and Settings.
+          <b>Staff PIN</b> unlocks Dashboard, New Registration, Active Bay, Invoices &amp; Receipts, Staff, and Expenses.
+          <b>Admin PIN</b> unlocks everything, including Revenue Reports and Settings.
           Leave both blank for open access with no login screen at all.
         </p>
         <div class="form-grid">
@@ -760,7 +774,7 @@ select{cursor:pointer;}
   <div class="ticket" id="invoiceTicket">
     <div class="stamp">INVOICE</div>
     <img id="invBizLogo" style="display:none;width:56px;height:56px;object-fit:cover;border-radius:8px;margin:0 auto 8px;">
-    <h3 id="invBizName">SplashBay</h3>
+    <h3 id="invBizName">OshaRide</h3>
     <div class="biz" id="invBizTagline">Wash Bay Control · Nairobi</div>
     <div class="ticket-notch"></div>
     <div id="invoiceBody"></div>
@@ -778,7 +792,7 @@ select{cursor:pointer;}
   <div class="ticket" id="receiptTicket">
     <div class="stamp" style="border-color:var(--aqua-dim);color:var(--aqua-dim);">PAID</div>
     <img id="rcBizLogo" style="display:none;width:56px;height:56px;object-fit:cover;border-radius:8px;margin:0 auto 8px;">
-    <h3 id="rcBizName">SplashBay</h3>
+    <h3 id="rcBizName">OshaRide</h3>
     <div class="biz" id="rcBizTagline">Payment Receipt</div>
     <div class="ticket-notch"></div>
     <div id="receiptBody"></div>
@@ -890,7 +904,7 @@ select{cursor:pointer;}
 <div class="modal-backdrop" id="lockScreen" style="display:none;">
   <div class="modal-box" id="roleChoiceBox" style="width:360px;text-align:center;background:rgba(21,40,65,.88);backdrop-filter:blur(6px);border-color:rgba(45,212,191,.25);">
     <svg viewBox="0 0 24 24" fill="none" style="width:36px;height:36px;margin:0 auto 14px;display:block;"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#2DD4BF"/></svg>
-    <h3 style="margin-bottom:6px;" id="roleChoiceBizName">SplashBay</h3>
+    <h3 style="margin-bottom:6px;" id="roleChoiceBizName">OshaRide</h3>
     <p style="color:var(--text-dim);font-size:13px;margin-bottom:20px;">Who's logging in?</p>
     <div class="modal-actions" style="flex-direction:column;gap:10px;">
       <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="chooseRole('staff')">👷 Staff Login</button>
@@ -920,7 +934,7 @@ const DEFAULT_SERVICES = [
   {name:"Interior Deep Clean", price:900},
   {name:"SUV / Van Full Wash", price:900},
 ];
-const DEFAULT_BUSINESS = { name:"SplashBay", tagline:"Wash Bay Control", phone:"", currency:"KSh" };
+const DEFAULT_BUSINESS = { name:"OshaRide", tagline:"Wash Bay Control", phone:"", currency:"KSh" };
 const DEFAULT_PRINT_SETTINGS = { paperWidth: "80mm" }; // "58mm" | "80mm" | "A4"
 
 function freshState(){
@@ -1003,7 +1017,7 @@ function showLockScreen(){
     document.getElementById("pinEntryBox").style.display = "block";
     document.getElementById("pinEntryTitle").textContent = "Enter Access PIN";
   }
-  document.getElementById("roleChoiceBizName").textContent = (state.business && state.business.name) || "SplashBay";
+  document.getElementById("roleChoiceBizName").textContent = (state.business && state.business.name) || "OshaRide";
 }
 function hideLockScreen(){
   document.getElementById("lockScreen").style.display = "none";
@@ -1045,7 +1059,7 @@ async function submitPin(){
   await bootApp();
 }
 /* ---- Apply role-based nav visibility (admin sees everything; staff is operational-only) ---- */
-const ADMIN_ONLY_VIEWS = ["staff","revenue","expenses","settings"];
+const ADMIN_ONLY_VIEWS = ["revenue","settings"];
 function applyRoleVisibility(){
   const isAdmin = currentRole !== "staff";
   document.querySelectorAll(".nav button[data-view]").forEach(btn=>{
@@ -1053,6 +1067,23 @@ function applyRoleVisibility(){
       btn.style.display = isAdmin ? "" : "none";
     }
   });
+  const sessionBox = document.getElementById("sessionBox");
+  if(pinRequired && currentRole){
+    sessionBox.style.display = "block";
+    const badge = document.getElementById("roleBadge");
+    badge.textContent = isAdmin ? "🔑 Admin" : "👷 Staff";
+    badge.className = "badge " + (isAdmin ? "active" : "in-bay");
+  } else {
+    sessionBox.style.display = "none";
+  }
+}
+async function logout(){
+  if(!confirm("Log out of " + (state.business.name || "OshaRide") + "?")) return;
+  accessPin = "";
+  currentRole = null;
+  localStorage.removeItem("splashbay-pin");
+  localStorage.removeItem("splashbay-role");
+  location.reload();
 }
 
 /* ---- Refresh whatever the person is currently looking at ---- */
@@ -1181,10 +1212,16 @@ function staffName(id){ const s = state.staff.find(s=>s.id===id); return s ? s.n
 
 /* ============ REGISTER FORM ============ */
 function populateRegisterForm(){
-  const svcSel = document.getElementById("fService");
-  svcSel.innerHTML = state.services.length
-    ? state.services.map(s=>`<option value="${s.id}">${s.name} — ${money(s.price)}</option>`).join("")
-    : `<option value="">No services configured — add one in Settings</option>`;
+  const list = document.getElementById("fServicesList");
+  list.innerHTML = state.services.length
+    ? state.services.map(s=>`
+        <label class="svc-check-row">
+          <input type="checkbox" value="${s.id}" onchange="updatePricePreview()">
+          <span class="svc-name">${s.name}</span>
+          <span class="svc-price">${money(s.price)}</span>
+        </label>
+      `).join("")
+    : `<div class="empty-note">No services configured — add one in Settings</div>`;
   const staffSel = document.getElementById("fStaff");
   const activeStaff = state.staff.filter(s=>s.status==="active");
   staffSel.innerHTML = activeStaff.length
@@ -1192,11 +1229,13 @@ function populateRegisterForm(){
     : `<option value="">No active staff — add one first</option>`;
   updatePricePreview();
 }
-document.getElementById("fService")?.addEventListener("change", updatePricePreview);
+function getSelectedServiceIds(){
+  return [...document.querySelectorAll('#fServicesList input[type="checkbox"]:checked')].map(cb=>Number(cb.value));
+}
 function updatePricePreview(){
-  const id = Number(document.getElementById("fService").value);
-  const service = state.services.find(s=>s.id===id);
-  document.getElementById("fPricePreview").textContent = money(service ? service.price : 0);
+  const ids = getSelectedServiceIds();
+  const total = state.services.filter(s=>ids.includes(s.id)).reduce((sum,s)=>sum+s.price,0);
+  document.getElementById("fPricePreview").textContent = money(total);
 }
 function clearRegisterForm(){
   ["fCustomer","fPhone","fPlate","fModel"].forEach(id=>document.getElementById(id).value="");
@@ -1208,15 +1247,15 @@ async function registerCar(){
   const phone = document.getElementById("fPhone").value.trim();
   const plate = document.getElementById("fPlate").value.trim().toUpperCase();
   const model = document.getElementById("fModel").value.trim();
-  const serviceId = document.getElementById("fService").value;
+  const serviceIds = getSelectedServiceIds();
   const staffId = document.getElementById("fStaff").value;
 
-  if(!customer || !plate || !serviceId || !staffId){
-    alert("Please fill in customer name, plate number, service and assign a staff member.");
+  if(!customer || !plate || !serviceIds.length || !staffId){
+    alert("Please fill in customer name, plate number, at least one service, and assign a staff member.");
     return;
   }
   try{
-    const job = await api("POST", "/api/jobs", { customer, phone, plate, model, serviceId: Number(serviceId), staffId: Number(staffId) });
+    const job = await api("POST", "/api/jobs", { customer, phone, plate, model, serviceIds, staffId: Number(staffId) });
     state.jobs.push(job);
     lastSyncTime = Date.now();
     clearRegisterForm();
@@ -1299,6 +1338,9 @@ function openInvoice(jobId){
   const invLogo = document.getElementById("invBizLogo");
   invLogo.style.display = state.business.logo ? "block" : "none";
   if(state.business.logo) invLogo.src = state.business.logo;
+  const svcRows = (j.services||[{name:j.service.name,price:j.service.price}]).map(s=>
+    `<div class="ticket-row"><span class="k">${s.name}</span><span class="v">${money(s.price)}</span></div>`
+  ).join("");
   document.getElementById("invoiceBody").innerHTML = `
     <div class="ticket-row"><span class="k">Order #</span><span class="v">${j.invoiceNo}</span></div>
     <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeIn)} ${fmtTime(j.timeIn)}</span></div>
@@ -1306,8 +1348,9 @@ function openInvoice(jobId){
     <div class="ticket-row"><span class="k">Phone</span><span class="v">${j.phone||"—"}</span></div>
     <div class="ticket-row"><span class="k">Plate</span><span class="v">${j.plate}</span></div>
     <div class="ticket-row"><span class="k">Vehicle</span><span class="v">${j.model||"—"}</span></div>
-    <div class="ticket-row"><span class="k">Service</span><span class="v">${j.service.name}</span></div>
     <div class="ticket-row"><span class="k">Attendant</span><span class="v">${staffName(j.staffId)}</span></div>
+    <div class="ticket-notch"></div>
+    ${svcRows}
   `;
   document.getElementById("invTotal").textContent = money(j.service.price);
   document.getElementById("invoiceBackdrop").classList.add("show");
@@ -1326,13 +1369,18 @@ function openReceipt(jobId){
   const rcLogo = document.getElementById("rcBizLogo");
   rcLogo.style.display = state.business.logo ? "block" : "none";
   if(state.business.logo) rcLogo.src = state.business.logo;
+  const svcRowsRc = (j.services||[{name:j.service.name,price:j.service.price}]).map(s=>
+    `<div class="ticket-row"><span class="k">${s.name}</span><span class="v">${money(s.price)}</span></div>`
+  ).join("");
   document.getElementById("receiptBody").innerHTML = `
     <div class="ticket-row"><span class="k">Order #</span><span class="v">${j.receiptNo}</span></div>
     <div class="ticket-row"><span class="k">Invoice Ref</span><span class="v">${j.invoiceNo}</span></div>
     <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeOut)} ${fmtTime(j.timeOut)}</span></div>
     <div class="ticket-row"><span class="k">Customer</span><span class="v">${j.customer}</span></div>
     <div class="ticket-row"><span class="k">Plate</span><span class="v">${j.plate}</span></div>
-    <div class="ticket-row"><span class="k">Service</span><span class="v">${j.service.name}</span></div>
+    <div class="ticket-notch"></div>
+    ${svcRowsRc}
+    <div class="ticket-notch"></div>
     <div class="ticket-row"><span class="k">Time In</span><span class="v">${fmtTime(j.timeIn)}</span></div>
     <div class="ticket-row"><span class="k">Time Out</span><span class="v">${fmtTime(j.timeOut)}</span></div>
     <div class="ticket-row"><span class="k">Payment Method</span><span class="v">${j.method}</span></div>
@@ -1910,7 +1958,7 @@ async function removeLogo(){
 async function saveBusinessSettings(){
   try{
     const business = await api("PUT", "/api/business", {
-      name: document.getElementById("setBizName").value.trim() || "SplashBay",
+      name: document.getElementById("setBizName").value.trim() || "OshaRide",
       tagline: document.getElementById("setBizTagline").value.trim(),
       phone: document.getElementById("setBizPhone").value.trim(),
       currency: document.getElementById("setBizCurrency").value.trim() || "KSh",
@@ -2025,7 +2073,7 @@ function importBackup(event){
     try{
       const parsed = JSON.parse(e.target.result);
       if(!parsed || !Array.isArray(parsed.jobs) || !Array.isArray(parsed.staff)){
-        alert("This doesn't look like a valid SplashBay backup file.");
+        alert("This doesn't look like a valid OshaRide backup file.");
         return;
       }
       if(!confirm("Importing will replace ALL current data with this backup. Continue?")) return;

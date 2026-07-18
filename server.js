@@ -56,6 +56,14 @@ app.use('/api', checkPin);
 
 /* ============ ROW <-> API SHAPE HELPERS ============ */
 function jobRowToApi(row) {
+  let services;
+  if (row.services_json) {
+    try { services = JSON.parse(row.services_json); } catch (e) { services = null; }
+  }
+  if (!services || !services.length) {
+    // backward compatibility for jobs recorded before multi-service support
+    services = [{ id: row.service_id, name: row.service_name, price: row.service_price }];
+  }
   return {
     id: row.id,
     invoiceNo: row.invoice_no,
@@ -65,6 +73,7 @@ function jobRowToApi(row) {
     plate: row.plate,
     model: row.model,
     service: { id: row.service_id, name: row.service_name, price: row.service_price },
+    services,
     staffId: row.staff_id,
     timeIn: row.time_in,
     timeOut: row.time_out,
@@ -104,8 +113,8 @@ app.get('/api/bootstrap', (req, res) => {
   res.json({ ...getFullState(), role: req.role });
 });
 
-/* ============ STAFF (admin only — attendant records & wages are sensitive) ============ */
-app.post('/api/staff', requireAdmin, (req, res) => {
+/* ============ STAFF (staff & admin) ============ */
+app.post('/api/staff', (req, res) => {
   const { name, role, phone } = req.body || {};
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name is required' });
   const info = db
@@ -114,7 +123,7 @@ app.post('/api/staff', requireAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(info.lastInsertRowid);
   res.json(staffRowToApi(row));
 });
-app.patch('/api/staff/:id', requireAdmin, (req, res) => {
+app.patch('/api/staff/:id', (req, res) => {
   const id = Number(req.params.id);
   const existing = db.prepare('SELECT * FROM staff WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Staff not found' });
@@ -123,7 +132,7 @@ app.patch('/api/staff/:id', requireAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(id);
   res.json(staffRowToApi(row));
 });
-app.delete('/api/staff/:id', requireAdmin, (req, res) => {
+app.delete('/api/staff/:id', (req, res) => {
   const id = Number(req.params.id);
   db.prepare('DELETE FROM staff WHERE id = ?').run(id);
   res.json({ ok: true });
@@ -161,28 +170,39 @@ app.delete('/api/services/:id', requireAdmin, (req, res) => {
 
 /* ============ JOBS (registration / checkout / cancel) ============ */
 app.post('/api/jobs', (req, res) => {
-  const { customer, phone, plate, model, serviceId, staffId } = req.body || {};
-  if (!customer || !plate || !serviceId || !staffId) {
-    return res.status(400).json({ error: 'customer, plate, serviceId and staffId are required' });
+  const { customer, phone, plate, model, staffId } = req.body || {};
+  // Accept either a new multi-service `serviceIds` array or the legacy single `serviceId`.
+  let serviceIds = req.body && req.body.serviceIds;
+  if ((!serviceIds || !serviceIds.length) && req.body && req.body.serviceId) {
+    serviceIds = [req.body.serviceId];
   }
-  const service = db.prepare('SELECT * FROM services WHERE id = ?').get(Number(serviceId));
-  if (!service) return res.status(400).json({ error: 'Unknown service' });
+  if (!customer || !plate || !serviceIds || !serviceIds.length || !staffId) {
+    return res.status(400).json({ error: 'customer, plate, at least one service, and staffId are required' });
+  }
+  const placeholders = serviceIds.map(() => '?').join(',');
+  const services = db.prepare(`SELECT * FROM services WHERE id IN (${placeholders})`).all(...serviceIds.map(Number));
+  if (!services.length) return res.status(400).json({ error: 'Unknown service(s)' });
+
+  const itemized = services.map(s => ({ id: s.id, name: s.name, price: s.price }));
+  const totalPrice = itemized.reduce((sum, s) => sum + s.price, 0);
+  const combinedName = itemized.map(s => s.name).join(' + ');
   const timeIn = Date.now();
 
   const insertJob = db.transaction(() => {
     const info = db
       .prepare(
-        `INSERT INTO jobs (customer, phone, plate, model, service_id, service_name, service_price, staff_id, time_in, status, paid)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in-bay', 0)`
+        `INSERT INTO jobs (customer, phone, plate, model, service_id, service_name, service_price, services_json, staff_id, time_in, status, paid)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'in-bay', 0)`
       )
       .run(
         String(customer).trim(),
         phone || '',
         String(plate).trim().toUpperCase(),
         model || '',
-        service.id,
-        service.name,
-        service.price,
+        itemized[0].id,
+        combinedName,
+        totalPrice,
+        JSON.stringify(itemized),
         Number(staffId),
         timeIn
       );
@@ -217,8 +237,8 @@ app.delete('/api/jobs/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-/* ============ EXPENSES (admin only — financial data) ============ */
-app.post('/api/expenses', requireAdmin, (req, res) => {
+/* ============ EXPENSES (staff & admin) ============ */
+app.post('/api/expenses', (req, res) => {
   const { date, category, description, amount } = req.body || {};
   const amt = Number(amount);
   if (isNaN(amt) || amt < 0) return res.status(400).json({ error: 'A valid amount is required' });
@@ -229,7 +249,7 @@ app.post('/api/expenses', requireAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM expenses WHERE id = ?').get(info.lastInsertRowid);
   res.json(expenseRowToApi(row));
 });
-app.patch('/api/expenses/:id', requireAdmin, (req, res) => {
+app.patch('/api/expenses/:id', (req, res) => {
   const id = Number(req.params.id);
   const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
@@ -244,7 +264,7 @@ app.patch('/api/expenses/:id', requireAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
   res.json(expenseRowToApi(row));
 });
-app.delete('/api/expenses/:id', requireAdmin, (req, res) => {
+app.delete('/api/expenses/:id', (req, res) => {
   const id = Number(req.params.id);
   db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
   res.json({ ok: true });
@@ -254,7 +274,7 @@ app.delete('/api/expenses/:id', requireAdmin, (req, res) => {
 app.put('/api/business', requireAdmin, (req, res) => {
   const { name, tagline, phone, currency } = req.body || {};
   db.prepare('UPDATE business SET name = ?, tagline = ?, phone = ?, currency = ? WHERE id = 1').run(
-    (name || 'SplashBay').trim(),
+    (name || 'OshaRide').trim(),
     tagline || '',
     phone || '',
     (currency || 'KSh').trim()
@@ -319,11 +339,14 @@ app.post('/api/import', requireAdmin, (req, res) => {
     });
 
     const insertJob = db.prepare(
-      `INSERT INTO jobs (invoice_no, receipt_no, customer, phone, plate, model, service_id, service_name, service_price, staff_id, time_in, time_out, status, paid, method)
-       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO jobs (invoice_no, receipt_no, customer, phone, plate, model, service_id, service_name, service_price, services_json, staff_id, time_in, time_out, status, paid, method)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     (payload.jobs || []).forEach(j => {
       const mappedStaffId = j.staffId != null && staffIdMap[j.staffId] != null ? staffIdMap[j.staffId] : null;
+      const itemized = (j.services && j.services.length) ? j.services : (j.service ? [j.service] : []);
+      const totalPrice = itemized.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+      const combinedName = itemized.map(s => s.name).join(' + ') || (j.service && j.service.name) || '';
       insertJob.run(
         j.invoiceNo || null,
         j.receiptNo || null,
@@ -331,8 +354,9 @@ app.post('/api/import', requireAdmin, (req, res) => {
         j.phone || '',
         j.plate || '',
         j.model || '',
-        (j.service && j.service.name) || '',
-        (j.service && j.service.price) || 0,
+        combinedName,
+        totalPrice || (j.service && j.service.price) || 0,
+        JSON.stringify(itemized),
         mappedStaffId,
         j.timeIn || Date.now(),
         j.timeOut || null,
@@ -344,7 +368,7 @@ app.post('/api/import', requireAdmin, (req, res) => {
 
     const biz = payload.business || {};
     db.prepare('UPDATE business SET name = ?, tagline = ?, phone = ?, currency = ?, logo = ? WHERE id = 1').run(
-      biz.name || 'SplashBay',
+      biz.name || 'OshaRide',
       biz.tagline || '',
       biz.phone || '',
       biz.currency || 'KSh',
@@ -365,7 +389,7 @@ app.post('/api/import', requireAdmin, (req, res) => {
 
 app.post('/api/reset', requireAdmin, (req, res) => {
   db.exec('DELETE FROM jobs; DELETE FROM staff; DELETE FROM services; DELETE FROM expenses;');
-  db.prepare(`UPDATE business SET name='SplashBay', tagline='Wash Bay Control', phone='', currency='KSh', logo=NULL WHERE id=1`).run();
+  db.prepare(`UPDATE business SET name='OshaRide', tagline='Wash Bay Control', phone='', currency='KSh', logo=NULL WHERE id=1`).run();
   db.prepare(`UPDATE print_settings SET paper_width='80mm' WHERE id=1`).run();
   const DEFAULT_SERVICES = [
     { name: 'Express Exterior Wash', price: 400 },
@@ -392,20 +416,20 @@ app.post('/api/sample-data', requireAdmin, (req, res) => {
   const svcB = services[2] || services[0];
 
   const insertJob = db.prepare(
-    `INSERT INTO jobs (invoice_no, receipt_no, customer, phone, plate, model, service_id, service_name, service_price, staff_id, time_in, time_out, status, paid, method)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 1, ?)`
+    `INSERT INTO jobs (invoice_no, receipt_no, customer, phone, plate, model, service_id, service_name, service_price, services_json, staff_id, time_in, time_out, status, paid, method)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 1, ?)`
   );
   if (svcA) {
     const id1 = insertJob.run(
       null, null, 'Alice Chebet', '0700111222', 'KDA 245B', 'Toyota Axio, Silver',
-      svcA.id, svcA.name, svcA.price, s1, now - 86400000, now - 86400000 + 3600000, 'Cash'
+      svcA.id, svcA.name, svcA.price, JSON.stringify([{id:svcA.id,name:svcA.name,price:svcA.price}]), s1, now - 86400000, now - 86400000 + 3600000, 'Cash'
     ).lastInsertRowid;
     db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('ORD-' + (1000+id1), 'ORD-' + (1000+id1), id1);
   }
   if (svcB) {
     const id2 = insertJob.run(
       null, null, 'Moses Kiptoo', '0700333444', 'KCB 998J', 'Subaru Forester, Blue',
-      svcB.id, svcB.name, svcB.price, s2, now - 3600000 * 5, now - 3600000 * 4, 'M-Pesa'
+      svcB.id, svcB.name, svcB.price, JSON.stringify([{id:svcB.id,name:svcB.name,price:svcB.price}]), s2, now - 3600000 * 5, now - 3600000 * 4, 'M-Pesa'
     ).lastInsertRowid;
     db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('ORD-' + (1000+id2), 'ORD-' + (1000+id2), id2);
   }
@@ -450,7 +474,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`SplashBay server running at http://localhost:${PORT}`);
+  console.log(`OshaRide server running at http://localhost:${PORT}`);
   console.log(`Database: ${path.join(__dirname, 'data', 'splashbay.db')}`);
   const { adminPin, staffPin } = getAuthSettings();
   if (adminPin || staffPin) console.log('PIN login is ENABLED (configure via Settings > Access & Roles).');

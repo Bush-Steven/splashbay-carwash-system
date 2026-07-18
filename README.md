@@ -1,10 +1,10 @@
-# SplashBay — Carwash Operations System (Full Stack + SQLite)
+# OshaRide — Carwash Operations System (Full Stack + SQLite)
 
 A complete carwash management system with a real **Node/Express backend** backed by an **SQLite database**, and an interactive frontend. Every device that opens the app (front desk PC, tablet at the bay, phone) shares the same **live** data — one source of truth for staff, jobs, invoices, receipts, and revenue.
 
 ## Features
 - **Dashboard** — today's revenue, cars in bay, cars washed today, staff on duty, 7-day revenue chart, service mix chart, live bay board, first-run onboarding
-- **New Registration** — check a car in and auto-generate a printable invoice
+- **New Registration** — check a car in, select every service the customer wants (multi-select with a running total), and auto-generate a printable itemized invoice
 - **Active Bay** — see all vehicles in progress, cancel a mistaken check-in, or check out with a payment method to generate a receipt
 - **Staff** — add/remove attendants, track Today / This Week / This Month / All-Time revenue and sales per person, with a detailed drill-down view and chart
 - **Invoices & Receipts** — full searchable history, reprintable any time, with delete for correcting mistakes
@@ -13,7 +13,7 @@ A complete carwash management system with a real **Node/Express backend** backed
 - **Settings** — business name/phone/currency (shown on every invoice & receipt), editable service catalog & prices, JSON backup export/import, CSV export for accounting, sample data loader, full reset
 - **Receipt Printer** — configurable paper width (58mm / 80mm thermal, or A4), works with any printer already installed on the computer
 - **Shared live data** — every open tab/device polls the server every few seconds, so a check-in on one terminal shows up on another automatically
-- **Two login roles — Staff & Admin** — separate PINs with different access. Staff can operate the Dashboard, New Registration, Active Bay, and Invoices & Receipts. Admin gets all of that plus Staff management, Revenue Reports, and Settings. Managed entirely from Settings → Access & Roles, no redeploy needed.
+- **Two login roles — Staff & Admin** — separate PINs with different access. Staff can operate the Dashboard, New Registration, Active Bay, Invoices & Receipts, Staff management, and Expenses. Admin gets all of that plus Revenue Reports and Settings. Managed entirely from Settings → Access & Roles, no redeploy needed. A role badge and Logout button appear in the sidebar whenever login is enabled.
 
 ## Database
 Data is stored in a real **SQLite database** (`data/splashbay.db`), managed with [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — no separate database server to install or run.
@@ -23,7 +23,7 @@ Schema (see `db.js`):
 - `print_settings` — single row: receipt paper width
 - `staff` — id, name, role, phone, status
 - `services` — id, name, price (your service catalog)
-- `jobs` — id, invoice/receipt numbers, customer/vehicle details, a **snapshot** of the service name & price at the time of registration (so editing a price later never rewrites history), foreign keys to `staff` and `services` (`ON DELETE SET NULL`, so deleting a staff member or service keeps historical job records intact)
+- `jobs` — id, invoice/receipt numbers, customer/vehicle details, and a **snapshot** of every service selected (name & price at the time of registration, so editing a price later never rewrites history) — a job can have one or many services, with the total computed automatically. Foreign keys to `staff` and `services` use `ON DELETE SET NULL`, so deleting a staff member or service keeps historical job records intact
 - `expenses` — id, date, category, description, amount
 
 ## Architecture
@@ -75,7 +75,7 @@ Then open **http://localhost:3000**. The database file is created automatically 
 Open the app, go to **Settings → Access & Roles**, and set an Admin PIN (and optionally a Staff PIN). That's it — no environment variables or redeploy needed. Rules:
 - Leave both blank → the app is fully open, no login screen (good for local/dev use).
 - Set only an **Admin PIN** → everyone who knows it gets full access (like the old single-PIN mode).
-- Set both → people choose **Staff** or **Admin** on the login screen. Staff PIN unlocks Dashboard, New Registration, Active Bay, and Invoices & Receipts. Admin PIN unlocks everything, including Staff management, Revenue Reports, and Settings.
+- Set both → people choose **Staff** or **Admin** on the login screen. Staff PIN unlocks Dashboard, New Registration, Active Bay, Invoices & Receipts, Staff, and Expenses. Admin PIN unlocks everything, including Revenue Reports and Settings.
 - You can't set a Staff PIN without an Admin PIN first — that's a safety guard so you can never lock yourself out of Settings.
 
 For convenience, the legacy `ACCESS_PIN` environment variable (from earlier versions) still works as a fallback Admin PIN until you set one in Settings.

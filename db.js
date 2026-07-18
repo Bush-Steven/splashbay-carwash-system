@@ -13,7 +13,7 @@ db.pragma('foreign_keys = ON');
 db.exec(`
 CREATE TABLE IF NOT EXISTS business (
   id INTEGER PRIMARY KEY CHECK (id = 1),
-  name TEXT NOT NULL DEFAULT 'SplashBay',
+  name TEXT NOT NULL DEFAULT 'OshaRide',
   tagline TEXT DEFAULT 'Wash Bay Control',
   phone TEXT DEFAULT '',
   currency TEXT NOT NULL DEFAULT 'KSh',
@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   service_id INTEGER,
   service_name TEXT NOT NULL,
   service_price REAL NOT NULL,
+  services_json TEXT,
   staff_id INTEGER,
   time_in INTEGER NOT NULL,
   time_out INTEGER,
@@ -86,6 +87,16 @@ const businessColumns = db.prepare(`PRAGMA table_info(business)`).all().map(c =>
 if (!businessColumns.includes('logo')) {
   db.exec(`ALTER TABLE business ADD COLUMN logo TEXT`);
 }
+// One-time rename: if an existing install still has the old default name
+// (meaning the owner never customized it), update it to the new default.
+const existingBiz = db.prepare('SELECT name FROM business WHERE id = 1').get();
+if (existingBiz && existingBiz.name === 'SplashBay') {
+  db.prepare(`UPDATE business SET name = 'OshaRide' WHERE id = 1`).run();
+}
+const jobsColumns = db.prepare(`PRAGMA table_info(jobs)`).all().map(c => c.name);
+if (!jobsColumns.includes('services_json')) {
+  db.exec(`ALTER TABLE jobs ADD COLUMN services_json TEXT`);
+}
 
 /* ---- seed sensible defaults on a brand-new database ---- */
 const DEFAULT_SERVICES = [
@@ -99,7 +110,7 @@ const DEFAULT_SERVICES = [
 
 if (!db.prepare('SELECT id FROM business WHERE id = 1').get()) {
   db.prepare(
-    `INSERT INTO business (id, name, tagline, phone, currency) VALUES (1, 'SplashBay', 'Wash Bay Control', '', 'KSh')`
+    `INSERT INTO business (id, name, tagline, phone, currency) VALUES (1, 'OshaRide', 'Wash Bay Control', '', 'KSh')`
   ).run();
 }
 if (!db.prepare('SELECT id FROM print_settings WHERE id = 1').get()) {
