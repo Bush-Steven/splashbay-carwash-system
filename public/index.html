@@ -1130,7 +1130,7 @@ function openReceipt(jobId){
   rcLogo.style.display = state.business.logo ? "block" : "none";
   if(state.business.logo) rcLogo.src = state.business.logo;
   document.getElementById("receiptBody").innerHTML = `
-    <div class="ticket-row"><span class="k">Receipt #</span><span class="v">${j.receiptNo}</span></div>
+    <div class="ticket-row"><span class="k">Order #</span><span class="v">${j.receiptNo}</span></div>
     <div class="ticket-row"><span class="k">Invoice Ref</span><span class="v">${j.invoiceNo}</span></div>
     <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeOut)} ${fmtTime(j.timeOut)}</span></div>
     <div class="ticket-row"><span class="k">Customer</span><span class="v">${j.customer}</span></div>
@@ -1702,7 +1702,7 @@ function csvEscape(v){
   return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
 }
 function exportRecordsCSV(){
-  const rows = [["Invoice","Receipt","Customer","Phone","Plate","Vehicle","Service","Staff","Time In","Time Out","Amount","Paid","Payment Method","Status"]];
+  const rows = [["Invoice","Order #","Customer","Phone","Plate","Vehicle","Service","Staff","Time In","Time Out","Amount","Paid","Payment Method","Status"]];
   [...state.jobs].sort((a,b)=>a.timeIn-b.timeIn).forEach(j=>{
     rows.push([
       j.invoiceNo, j.receiptNo||"", j.customer, j.phone||"", j.plate, j.model||"",

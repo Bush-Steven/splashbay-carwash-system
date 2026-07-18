@@ -164,7 +164,7 @@ app.post('/api/jobs/:id/checkout', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Job not found' });
   const { method } = req.body || {};
   const timeOut = Date.now();
-  const receiptNo = 'RCT-' + (1000 + id);
+  const receiptNo = 'ORD-' + (1000 + id);
   db.prepare(
     `UPDATE jobs SET time_out = ?, status = 'completed', paid = 1, method = ?, receipt_no = ? WHERE id = ?`
   ).run(timeOut, method || 'Cash', receiptNo, id);
@@ -323,14 +323,14 @@ app.post('/api/sample-data', (req, res) => {
       null, null, 'Alice Chebet', '0700111222', 'KDA 245B', 'Toyota Axio, Silver',
       svcA.id, svcA.name, svcA.price, s1, now - 86400000, now - 86400000 + 3600000, 'Cash'
     ).lastInsertRowid;
-    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('INV-' + (1000+id1), 'RCT-' + (1000+id1), id1);
+    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('INV-' + (1000+id1), 'ORD-' + (1000+id1), id1);
   }
   if (svcB) {
     const id2 = insertJob.run(
       null, null, 'Moses Kiptoo', '0700333444', 'KCB 998J', 'Subaru Forester, Blue',
       svcB.id, svcB.name, svcB.price, s2, now - 3600000 * 5, now - 3600000 * 4, 'M-Pesa'
     ).lastInsertRowid;
-    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('INV-' + (1000+id2), 'RCT-' + (1000+id2), id2);
+    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('INV-' + (1000+id2), 'ORD-' + (1000+id2), id2);
   }
   res.json(getFullState());
 });
