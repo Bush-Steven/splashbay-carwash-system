@@ -108,6 +108,22 @@ body{
 .topbar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:14px;}
 .topbar h1{font-family:var(--disp);font-weight:700;font-size:34px;letter-spacing:.2px;}
 .topbar p{color:var(--text-dim);font-size:13.5px;margin-top:2px;}
+.live-badge{
+  display:inline-flex;align-items:center;gap:6px;margin-left:10px;
+  font-family:var(--mono);font-size:10.5px;color:var(--aqua);letter-spacing:.5px;text-transform:uppercase;
+  vertical-align:middle;
+}
+.live-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--aqua);flex-shrink:0;
+  box-shadow:0 0 0 rgba(45,212,191,.6);
+  animation:live-pulse 1.8s infinite;
+}
+.live-dot.stale{ background:var(--text-dim); animation:none; box-shadow:none; }
+@keyframes live-pulse{
+  0%{ box-shadow:0 0 0 0 rgba(45,212,191,.55); }
+  70%{ box-shadow:0 0 0 6px rgba(45,212,191,0); }
+  100%{ box-shadow:0 0 0 0 rgba(45,212,191,0); }
+}
 .topbar-actions{display:flex;gap:10px;}
 
 .btn{
@@ -299,6 +315,7 @@ select{cursor:pointer;}
         <div>
           <h1>Dashboard</h1>
           <p id="todayLabel">Today's overview</p>
+          <span class="live-badge"><span class="live-dot"></span><span class="live-label">Live</span></span>
         </div>
         <div class="topbar-actions">
           <button class="btn btn-primary" onclick="switchView('register')">+ New Registration</button>
@@ -438,7 +455,7 @@ select{cursor:pointer;}
       <div class="topbar">
         <div>
           <h1>Staff</h1>
-          <p>Manage your wash attendants</p>
+          <p>Manage your wash attendants <span class="live-badge"><span class="live-dot"></span><span class="live-label">Live</span></span></p>
         </div>
         <div class="topbar-actions">
           <button class="btn btn-primary" onclick="openStaffModal()">+ Add Staff</button>
@@ -794,6 +811,7 @@ async function loadState(){
   state.services = loaded.services && loaded.services.length ? loaded.services : DEFAULT_SERVICES.map(s=>({...s}));
   state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
   state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, loaded.printSettings||{});
+  lastSyncTime = Date.now();
 }
 /* api() — thin helper for talking to the real database-backed REST endpoints */
 async function api(method, url, body){
@@ -827,9 +845,42 @@ async function submitPin(){
   await bootApp();
 }
 
+/* ---- Refresh whatever the person is currently looking at ---- */
+let lastSyncTime = null;
+function getActiveViewName(){
+  const activeBtn = document.querySelector(".nav button.active");
+  return activeBtn ? activeBtn.dataset.view : "dashboard";
+}
+function refreshActiveView(){
+  const v = getActiveViewName();
+  if(v==="dashboard") renderDashboard();
+  if(v==="bay") renderBay();
+  if(v==="staff") renderStaff();
+  if(v==="records") renderRecords();
+  if(v==="revenue") renderRevenue();
+  updateBayTag();
+  if(currentStaffDetailId!=null && document.getElementById("staffDetailBackdrop").classList.contains("show")){
+    renderStaffDetail(currentStaffDetailId);
+  }
+  updateLiveBadge();
+}
+function updateLiveBadge(){
+  const dots = document.querySelectorAll(".live-dot");
+  const labels = document.querySelectorAll(".live-label");
+  const text = lastSyncTime ? "Live · synced " + timeAgo(lastSyncTime) : "Live";
+  labels.forEach(l=>l.textContent = text);
+  dots.forEach(d=>d.classList.remove("stale"));
+}
+function timeAgo(ts){
+  const s = Math.max(0, Math.round((Date.now()-ts)/1000));
+  if(s < 3) return "just now";
+  if(s < 60) return s + "s ago";
+  return Math.floor(s/60) + "m ago";
+}
+
 /* ---- Live sync: pick up changes made from other devices/terminals ---- */
 async function pollForUpdates(){
-  if(document.hidden || pinRequired && !accessPin) return;
+  if(document.hidden || (pinRequired && !accessPin)) return;
   try{
     const res = await fetch("/api/bootstrap", { headers: authHeaders() });
     if(!res.ok) return;
@@ -839,15 +890,8 @@ async function pollForUpdates(){
     state.business = Object.assign({...DEFAULT_BUSINESS}, loaded.business||{});
     state.printSettings = Object.assign({...DEFAULT_PRINT_SETTINGS}, loaded.printSettings||{});
     applyBusinessBranding();
-    const activeBtn = document.querySelector(".nav button.active");
-    const activeView = activeBtn ? activeBtn.dataset.view : "dashboard";
-    if(["dashboard","bay","staff","records","revenue"].includes(activeView)){
-      if(activeView==="dashboard") renderDashboard();
-      if(activeView==="bay") renderBay();
-      if(activeView==="staff") renderStaff();
-      if(activeView==="records") renderRecords();
-      if(activeView==="revenue") renderRevenue();
-    }
+    lastSyncTime = Date.now();
+    refreshActiveView();
   }catch(e){ /* offline or server restarting — ignore, will retry */ }
 }
 
@@ -953,9 +997,10 @@ async function registerCar(){
   try{
     const job = await api("POST", "/api/jobs", { customer, phone, plate, model, serviceId: Number(serviceId), staffId: Number(staffId) });
     state.jobs.push(job);
+    lastSyncTime = Date.now();
     clearRegisterForm();
     openInvoice(job.id);
-    updateBayTag();
+    refreshActiveView();
   }catch(e){
     alert("Couldn't register the vehicle: " + e.message);
   }
@@ -989,9 +1034,8 @@ async function cancelJob(jobId){
   try{
     await api("DELETE", "/api/jobs/" + jobId);
     state.jobs = state.jobs.filter(j=>j.id!==jobId);
-    renderBay();
-    updateBayTag();
-    renderDashboard();
+    lastSyncTime = Date.now();
+    refreshActiveView();
   }catch(e){
     alert("Couldn't cancel: " + e.message);
   }
@@ -1016,10 +1060,10 @@ async function confirmCheckout(){
   try{
     const updated = await api("POST", "/api/jobs/" + j.id + "/checkout", { method });
     Object.assign(j, updated);
+    lastSyncTime = Date.now();
     closePayModal();
     openReceipt(j.id);
-    renderBay();
-    updateBayTag();
+    refreshActiveView();
   }catch(e){
     alert("Couldn't complete checkout: " + e.message);
   }
@@ -1134,9 +1178,10 @@ async function addStaff(){
   try{
     const staff = await api("POST", "/api/staff", { name, role, phone });
     state.staff.push(staff);
+    lastSyncTime = Date.now();
     closeStaffModal();
-    renderStaff();
     populateRegisterForm();
+    refreshActiveView();
   }catch(e){
     alert("Couldn't add staff: " + e.message);
   }
@@ -1147,8 +1192,9 @@ async function toggleStaffStatus(id){
   try{
     const updated = await api("PATCH", "/api/staff/" + id, { status: newStatus });
     Object.assign(s, updated);
-    renderStaff();
+    lastSyncTime = Date.now();
     populateRegisterForm();
+    refreshActiveView();
   }catch(e){
     alert("Couldn't update staff: " + e.message);
   }
@@ -1160,8 +1206,9 @@ async function removeStaff(id){
     state.staff = state.staff.filter(s=>s.id!==id);
     // mirror the database's ON DELETE SET NULL so past jobs show "Unassigned" immediately
     state.jobs.forEach(j=>{ if(j.staffId===id) j.staffId=null; });
-    renderStaff();
+    lastSyncTime = Date.now();
     populateRegisterForm();
+    refreshActiveView();
   }catch(e){
     alert("Couldn't remove staff: " + e.message);
   }
@@ -1281,8 +1328,8 @@ async function deleteRecord(jobId){
   try{
     await api("DELETE", "/api/jobs/" + jobId);
     state.jobs = state.jobs.filter(j=>j.id!==jobId);
-    renderRecords();
-    renderDashboard();
+    lastSyncTime = Date.now();
+    refreshActiveView();
   }catch(e){
     alert("Couldn't delete: " + e.message);
   }
@@ -1432,6 +1479,7 @@ async function saveBusinessSettings(){
       currency: document.getElementById("setBizCurrency").value.trim() || "KSh",
     });
     state.business = business;
+    lastSyncTime = Date.now();
     applyBusinessBranding();
     renderDashboard();
     alert("Business details saved.");
@@ -1443,6 +1491,7 @@ async function savePrintSettings(){
   try{
     const printSettings = await api("PUT", "/api/print-settings", { paperWidth: document.getElementById("setPaperWidth").value });
     state.printSettings = printSettings;
+    lastSyncTime = Date.now();
     alert("Printer settings saved. Use \"Print Test Receipt\" to check it looks right.");
   }catch(e){
     alert("Couldn't save printer settings: " + e.message);
@@ -1465,6 +1514,7 @@ async function updateServiceName(id, val){
   try{
     const updated = await api("PATCH", "/api/services/" + id, { name: val.trim() });
     Object.assign(s, updated);
+    lastSyncTime = Date.now();
     populateRegisterForm();
   }catch(e){
     alert("Couldn't update service: " + e.message);
@@ -1477,6 +1527,7 @@ async function updateServicePrice(id, val){
   try{
     const updated = await api("PATCH", "/api/services/" + id, { price });
     Object.assign(s, updated);
+    lastSyncTime = Date.now();
     renderServicesTable();
     populateRegisterForm();
   }catch(e){
@@ -1488,6 +1539,7 @@ async function removeService(id){
   try{
     await api("DELETE", "/api/services/" + id);
     state.services = state.services.filter(s=>s.id!==id);
+    lastSyncTime = Date.now();
     renderServicesTable();
     populateRegisterForm();
   }catch(e){
@@ -1504,6 +1556,7 @@ async function addService(){
   try{
     const service = await api("POST", "/api/services", { name, price });
     state.services.push(service);
+    lastSyncTime = Date.now();
     document.getElementById("newSvcName").value = "";
     document.getElementById("newSvcPrice").value = "";
     renderServicesTable();
@@ -1595,6 +1648,7 @@ async function resetAllData(){
 /* ============ CLOCK ============ */
 function tickClock(){
   document.getElementById("clock").textContent = new Date().toLocaleTimeString();
+  updateLiveBadge();
 }
 setInterval(tickClock, 1000);
 
@@ -1620,7 +1674,7 @@ async function bootApp(){
   }catch(e){
     // 401 already shows the lock screen from loadState()
   }
-  setInterval(pollForUpdates, 8000);
+  setInterval(pollForUpdates, 5000);
 })();
 </script>
 </body>
