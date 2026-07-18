@@ -148,7 +148,7 @@ app.post('/api/jobs', (req, res) => {
         timeIn
       );
     const id = info.lastInsertRowid;
-    const invoiceNo = 'INV-' + (1000 + id);
+    const invoiceNo = 'ORD-' + (1000 + id);
     db.prepare('UPDATE jobs SET invoice_no = ? WHERE id = ?').run(invoiceNo, id);
     return id;
   });
@@ -323,14 +323,14 @@ app.post('/api/sample-data', (req, res) => {
       null, null, 'Alice Chebet', '0700111222', 'KDA 245B', 'Toyota Axio, Silver',
       svcA.id, svcA.name, svcA.price, s1, now - 86400000, now - 86400000 + 3600000, 'Cash'
     ).lastInsertRowid;
-    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('INV-' + (1000+id1), 'ORD-' + (1000+id1), id1);
+    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('ORD-' + (1000+id1), 'ORD-' + (1000+id1), id1);
   }
   if (svcB) {
     const id2 = insertJob.run(
       null, null, 'Moses Kiptoo', '0700333444', 'KCB 998J', 'Subaru Forester, Blue',
       svcB.id, svcB.name, svcB.price, s2, now - 3600000 * 5, now - 3600000 * 4, 'M-Pesa'
     ).lastInsertRowid;
-    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('INV-' + (1000+id2), 'ORD-' + (1000+id2), id2);
+    db.prepare('UPDATE jobs SET invoice_no=?, receipt_no=? WHERE id=?').run('ORD-' + (1000+id2), 'ORD-' + (1000+id2), id2);
   }
   res.json(getFullState());
 });

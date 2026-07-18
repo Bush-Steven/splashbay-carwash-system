@@ -1109,7 +1109,7 @@ function openInvoice(jobId){
   invLogo.style.display = state.business.logo ? "block" : "none";
   if(state.business.logo) invLogo.src = state.business.logo;
   document.getElementById("invoiceBody").innerHTML = `
-    <div class="ticket-row"><span class="k">Invoice #</span><span class="v">${j.invoiceNo}</span></div>
+    <div class="ticket-row"><span class="k">Order #</span><span class="v">${j.invoiceNo}</span></div>
     <div class="ticket-row"><span class="k">Date</span><span class="v">${fmtDate(j.timeIn)} ${fmtTime(j.timeIn)}</span></div>
     <div class="ticket-row"><span class="k">Customer</span><span class="v">${j.customer}</span></div>
     <div class="ticket-row"><span class="k">Phone</span><span class="v">${j.phone||"—"}</span></div>
