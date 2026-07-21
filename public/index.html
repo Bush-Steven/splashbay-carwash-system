@@ -278,9 +278,12 @@ select{cursor:pointer;}
 .close-x{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;}
 
 @media print{
+  body{background:none !important;}
   body *{visibility:hidden;}
-  .ticket, .ticket *{visibility:visible;}
+  .ticket, .ticket *{visibility:visible; color:#000 !important;}
   .ticket{position:fixed;top:0;left:0;box-shadow:none;background-image:none;}
+  .ticket-row .k, .biz, .ticket-foot{ font-weight:600 !important; }
+  .stamp{ border-color:#000 !important; color:#000 !important; }
   .modal-actions{display:none;}
 }
 
@@ -1331,6 +1334,9 @@ async function confirmCheckout(){
 
 /* ============ INVOICE / RECEIPT TICKETS ============ */
 function openInvoice(jobId){
+  // Only one ticket should ever be open/printable at a time.
+  document.getElementById("receiptBackdrop").classList.remove("show");
+  document.getElementById("receiptActionsWrap").style.display="none";
   const j = state.jobs.find(j=>j.id===jobId);
   currentTicketId = "invoiceTicket";
   document.getElementById("invBizName").textContent = state.business.name;
@@ -1362,6 +1368,9 @@ function closeInvoice(){
   renderDashboard();
 }
 function openReceipt(jobId){
+  // Only one ticket should ever be open/printable at a time.
+  document.getElementById("invoiceBackdrop").classList.remove("show");
+  document.getElementById("invoiceActionsWrap").style.display="none";
   const j = state.jobs.find(j=>j.id===jobId);
   currentTicketId = "receiptTicket";
   document.getElementById("rcBizName").textContent = state.business.name;
@@ -1423,7 +1432,15 @@ function printCurrentTicket(){
     styleEl.id = "dynPrintStyle";
     document.head.appendChild(styleEl);
   }
-  styleEl.textContent = "@media print{ " + printCssFor(paperWidth) + " }";
+  // Only the ticket currently open should ever print — even if another ticket's
+  // modal was somehow left open in the background, explicitly hide it here so a
+  // single Print action can never produce more than one ticket.
+  const otherTicketId = currentTicketId === "invoiceTicket" ? "receiptTicket" : "invoiceTicket";
+  styleEl.textContent = `@media print{
+    body{ background:none !important; }
+    #${otherTicketId}{ display:none !important; }
+    ${printCssFor(paperWidth)}
+  }`;
   window.print();
 }
 function testPrint(){
