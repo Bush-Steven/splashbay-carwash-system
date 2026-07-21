@@ -279,12 +279,28 @@ select{cursor:pointer;}
 
 @media print{
   body{background:none !important;}
-  body *{visibility:hidden;}
-  .ticket, .ticket *{visibility:visible; color:#000 !important;}
-  .ticket{position:fixed;top:0;left:0;box-shadow:none;background-image:none;}
+  /* Remove the whole dashboard from layout entirely (not just visually) —
+     visibility:hidden alone still reserves its full page height, which was
+     causing the fixed-position ticket to repeat across multiple blank pages. */
+  .app{display:none !important;}
+  .modal-backdrop{display:none !important;}
+  .modal-backdrop.show{
+    display:block !important;
+    position:static !important;
+    background:none !important;
+    backdrop-filter:none !important;
+    padding:0 !important;
+  }
+  .ticket{
+    position:static !important;
+    margin:0 auto !important;
+    box-shadow:none !important;
+    background-image:none !important;
+  }
+  .ticket *{ color:#000 !important; }
   .ticket-row .k, .biz, .ticket-foot{ font-weight:600 !important; }
   .stamp{ border-color:#000 !important; color:#000 !important; }
-  .modal-actions{display:none;}
+  .modal-actions{display:none !important;}
 }
 
 @media (max-width:980px){
