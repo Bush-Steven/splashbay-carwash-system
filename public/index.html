@@ -254,9 +254,9 @@ select{cursor:pointer;}
 .ticket-notch{border-top:2px dashed #c9c3b4;margin:14px 0;}
 .ticket h3{font-family:var(--disp);font-size:22px;letter-spacing:1px;text-align:center;text-transform:uppercase;}
 .ticket .biz{text-align:center;font-size:10px;color:var(--ink-dim);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
-.ticket-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;}
-.ticket-row .k{color:var(--ink-dim);}
-.ticket-row .v{font-weight:700;text-align:right;}
+.ticket-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;padding:3px 0;}
+.ticket-row .k{color:var(--ink-dim);flex:1;min-width:0;word-break:break-word;}
+.ticket-row .v{font-weight:700;text-align:right;flex-shrink:0;white-space:nowrap;}
 .ticket-total{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:2px solid var(--ink);}
 .ticket-total .k{font-family:var(--disp);font-size:16px;text-transform:uppercase;}
 .ticket-total .v{font-family:var(--disp);font-size:26px;font-weight:700;}
@@ -1427,17 +1427,22 @@ function closeReceipt(){
    included, as long as it's set up as a system printer. ---- */
 function printCssFor(paperWidth){
   if(paperWidth === "58mm"){
-    return `@page{ size:58mm auto; margin:2mm; }
-      .ticket{ width:52mm !important; font-size:10.5px; padding:10px 8px 8px; }
-      .ticket h3{ font-size:16px; } .ticket-total .v{ font-size:18px; }`;
+    // Most 58mm thermal printers only print a ~48mm-wide dot area even though
+    // the paper roll itself is 58mm — going wider than that gets clipped on
+    // real hardware, even if it looks fine in an on-screen PDF preview.
+    return `@page{ size:58mm auto; margin:4mm 5mm; }
+      .ticket{ width:48mm !important; font-size:10px; padding:8px 6px 6px; }
+      .ticket h3{ font-size:15px; } .ticket-total .v{ font-size:17px; }
+      .biz{ font-size:9px; } .ticket-row{ font-size:10.5px; }`;
   }
   if(paperWidth === "A4"){
     return `@page{ size:A4; margin:20mm; }
       .ticket{ width:340px !important; margin:0 auto; }`;
   }
-  // default: 80mm thermal receipt roll (most common POS/carwash printer)
-  return `@page{ size:80mm auto; margin:3mm; }
-    .ticket{ width:72mm !important; font-size:12px; padding:14px 10px 10px; }
+  // default: 80mm thermal receipt roll — printable area is commonly ~72mm even
+  // though the roll itself is 80mm wide.
+  return `@page{ size:80mm auto; margin:3mm 4mm; }
+    .ticket{ width:72mm !important; font-size:12px; padding:14px 8px 10px; }
     .ticket h3{ font-size:19px; }`;
 }
 function printCurrentTicket(){
